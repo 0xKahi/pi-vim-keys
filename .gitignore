@@ -1,0 +1,58 @@
+# Build
+dist/
+*.tsbuildinfo
+
+# Dependencies
+node_modules/
+.pi/npm/
+
+# Logs
+logs/
+*.log
+
+# Coverage
+coverage/
+*.lcov
+.nyc_output/
+
+# Runtime
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# npm pack output
+*.tgz
+
+# dotenv
+.env
+.env.*
+!.env.example
+
+# pnpm
+.pnpm-store
+
+# Vite
+vite.config.js.timestamp-*
+vite.config.ts.timestamp-*
+.vite/
+
+# Fallow
+.fallow/
+
+# Nix / devenv (catppuccin)
+.devenv*
+.direnv
+result
+# .ref/

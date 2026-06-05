@@ -1,0 +1,635 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://raw.githubusercontent.com/0xKahi/pi-vim-keys/main/assets/config.schema.json",
+  "title": "Pi Vim Key Extension Configuration",
+  "description": "Configuration schema for pi-vim-keys extension",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "colors": {
+      "default": {
+        "normal": "#55BBF9",
+        "insert": "#72F6B2"
+      },
+      "type": "object",
+      "properties": {
+        "normal": {
+          "default": "#55BBF9",
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "insert": {
+          "default": "#72F6B2",
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        }
+      },
+      "required": [
+        "normal",
+        "insert"
+      ],
+      "additionalProperties": false
+    },
+    "normalModeRemap": {
+      "default": {
+        "type": "single",
+        "key": "escape"
+      },
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "single",
+              "description": "A single key to go into normal mode e.g. \"escape\""
+            },
+            "key": {
+              "anyOf": [
+                {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "0",
+                        "1",
+                        "2",
+                        "3",
+                        "4",
+                        "5",
+                        "6",
+                        "7",
+                        "8",
+                        "9"
+                      ]
+                    },
+                    {
+                      "type": "string",
+                      "enum": [
+                        "a",
+                        "b",
+                        "c",
+                        "d",
+                        "e",
+                        "f",
+                        "g",
+                        "h",
+                        "i",
+                        "j",
+                        "k",
+                        "l",
+                        "m",
+                        "n",
+                        "o",
+                        "p",
+                        "q",
+                        "r",
+                        "s",
+                        "t",
+                        "u",
+                        "v",
+                        "w",
+                        "x",
+                        "y",
+                        "z"
+                      ]
+                    },
+                    {
+                      "type": "string",
+                      "enum": [
+                        "`",
+                        "-",
+                        "=",
+                        "[",
+                        "]",
+                        "\\",
+                        ";",
+                        "'",
+                        ",",
+                        ".",
+                        "/",
+                        "!",
+                        "@",
+                        "#",
+                        "$",
+                        "%",
+                        "^",
+                        "&",
+                        "*",
+                        "(",
+                        ")",
+                        "_",
+                        "+",
+                        "|",
+                        "~",
+                        "{",
+                        "}",
+                        ":",
+                        "<",
+                        ">",
+                        "?"
+                      ]
+                    },
+                    {
+                      "type": "string",
+                      "enum": [
+                        "escape",
+                        "esc",
+                        "enter",
+                        "return",
+                        "tab",
+                        "space",
+                        "backspace",
+                        "delete",
+                        "insert",
+                        "clear",
+                        "home",
+                        "end",
+                        "pageUp",
+                        "pageDown",
+                        "up",
+                        "down",
+                        "left",
+                        "right",
+                        "f1",
+                        "f2",
+                        "f3",
+                        "f4",
+                        "f5",
+                        "f6",
+                        "f7",
+                        "f8",
+                        "f9",
+                        "f10",
+                        "f11",
+                        "f12"
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "string",
+                  "pattern": "^(ctrl|shift|alt|super)(\\+)((0|1|2|3|4|5|6|7|8|9)|(a|b|c|d|e|f|g|h|i|j|k|l|m|n|o|p|q|r|s|t|u|v|w|x|y|z)|(`|-|=|\\[|\\]|\\\\|;|'|,|\\.|\\/|!|@|#|\\$|%|\\^|&|\\*|\\(|\\)|_|\\+|\\||~|\\{|\\}|:|<|>|\\?)|(escape|esc|enter|return|tab|space|backspace|delete|insert|clear|home|end|pageUp|pageDown|up|down|left|right|f1|f2|f3|f4|f5|f6|f7|f8|f9|f10|f11|f12))$"
+                }
+              ]
+            }
+          },
+          "required": [
+            "type",
+            "key"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "sequence",
+              "description": "A sequence of two keys to go into normal mode e.g. \"kj\""
+            },
+            "firstKey": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "0",
+                    "1",
+                    "2",
+                    "3",
+                    "4",
+                    "5",
+                    "6",
+                    "7",
+                    "8",
+                    "9"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "a",
+                    "b",
+                    "c",
+                    "d",
+                    "e",
+                    "f",
+                    "g",
+                    "h",
+                    "i",
+                    "j",
+                    "k",
+                    "l",
+                    "m",
+                    "n",
+                    "o",
+                    "p",
+                    "q",
+                    "r",
+                    "s",
+                    "t",
+                    "u",
+                    "v",
+                    "w",
+                    "x",
+                    "y",
+                    "z"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "`",
+                    "-",
+                    "=",
+                    "[",
+                    "]",
+                    "\\",
+                    ";",
+                    "'",
+                    ",",
+                    ".",
+                    "/",
+                    "!",
+                    "@",
+                    "#",
+                    "$",
+                    "%",
+                    "^",
+                    "&",
+                    "*",
+                    "(",
+                    ")",
+                    "_",
+                    "+",
+                    "|",
+                    "~",
+                    "{",
+                    "}",
+                    ":",
+                    "<",
+                    ">",
+                    "?"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "escape",
+                    "esc",
+                    "enter",
+                    "return",
+                    "tab",
+                    "space",
+                    "backspace",
+                    "delete",
+                    "insert",
+                    "clear",
+                    "home",
+                    "end",
+                    "pageUp",
+                    "pageDown",
+                    "up",
+                    "down",
+                    "left",
+                    "right",
+                    "f1",
+                    "f2",
+                    "f3",
+                    "f4",
+                    "f5",
+                    "f6",
+                    "f7",
+                    "f8",
+                    "f9",
+                    "f10",
+                    "f11",
+                    "f12"
+                  ]
+                }
+              ]
+            },
+            "secondKey": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "0",
+                    "1",
+                    "2",
+                    "3",
+                    "4",
+                    "5",
+                    "6",
+                    "7",
+                    "8",
+                    "9"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "a",
+                    "b",
+                    "c",
+                    "d",
+                    "e",
+                    "f",
+                    "g",
+                    "h",
+                    "i",
+                    "j",
+                    "k",
+                    "l",
+                    "m",
+                    "n",
+                    "o",
+                    "p",
+                    "q",
+                    "r",
+                    "s",
+                    "t",
+                    "u",
+                    "v",
+                    "w",
+                    "x",
+                    "y",
+                    "z"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "`",
+                    "-",
+                    "=",
+                    "[",
+                    "]",
+                    "\\",
+                    ";",
+                    "'",
+                    ",",
+                    ".",
+                    "/",
+                    "!",
+                    "@",
+                    "#",
+                    "$",
+                    "%",
+                    "^",
+                    "&",
+                    "*",
+                    "(",
+                    ")",
+                    "_",
+                    "+",
+                    "|",
+                    "~",
+                    "{",
+                    "}",
+                    ":",
+                    "<",
+                    ">",
+                    "?"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "escape",
+                    "esc",
+                    "enter",
+                    "return",
+                    "tab",
+                    "space",
+                    "backspace",
+                    "delete",
+                    "insert",
+                    "clear",
+                    "home",
+                    "end",
+                    "pageUp",
+                    "pageDown",
+                    "up",
+                    "down",
+                    "left",
+                    "right",
+                    "f1",
+                    "f2",
+                    "f3",
+                    "f4",
+                    "f5",
+                    "f6",
+                    "f7",
+                    "f8",
+                    "f9",
+                    "f10",
+                    "f11",
+                    "f12"
+                  ]
+                }
+              ]
+            }
+          },
+          "required": [
+            "type",
+            "firstKey",
+            "secondKey"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "keybinds": {
+      "default": {},
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "enum": [
+          "app.interrupt",
+          "app.clear",
+          "app.exit",
+          "app.suspend",
+          "app.thinking.cycle",
+          "app.model.cycleForward",
+          "app.model.cycleBackward",
+          "app.model.select",
+          "app.tools.expand",
+          "app.thinking.toggle",
+          "app.session.toggleNamedFilter",
+          "app.editor.external",
+          "app.message.followUp",
+          "app.message.dequeue",
+          "app.clipboard.pasteImage",
+          "app.session.new",
+          "app.session.tree",
+          "app.session.fork",
+          "app.session.resume",
+          "app.tree.foldOrUp",
+          "app.tree.unfoldOrDown",
+          "app.tree.editLabel",
+          "app.tree.toggleLabelTimestamp",
+          "app.session.togglePath",
+          "app.session.toggleSort",
+          "app.session.rename",
+          "app.session.delete",
+          "app.session.deleteNoninvasive",
+          "app.models.save",
+          "app.models.enableAll",
+          "app.models.clearAll",
+          "app.models.toggleProvider",
+          "app.models.reorderUp",
+          "app.models.reorderDown",
+          "app.tree.filter.default",
+          "app.tree.filter.noTools",
+          "app.tree.filter.userOnly",
+          "app.tree.filter.labeledOnly",
+          "app.tree.filter.all",
+          "app.tree.filter.cycleForward",
+          "app.tree.filter.cycleBackward"
+        ]
+      },
+      "additionalProperties": {
+        "anyOf": [
+          {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "0",
+                  "1",
+                  "2",
+                  "3",
+                  "4",
+                  "5",
+                  "6",
+                  "7",
+                  "8",
+                  "9"
+                ]
+              },
+              {
+                "type": "string",
+                "enum": [
+                  "a",
+                  "b",
+                  "c",
+                  "d",
+                  "e",
+                  "f",
+                  "g",
+                  "h",
+                  "i",
+                  "j",
+                  "k",
+                  "l",
+                  "m",
+                  "n",
+                  "o",
+                  "p",
+                  "q",
+                  "r",
+                  "s",
+                  "t",
+                  "u",
+                  "v",
+                  "w",
+                  "x",
+                  "y",
+                  "z"
+                ]
+              },
+              {
+                "type": "string",
+                "enum": [
+                  "`",
+                  "-",
+                  "=",
+                  "[",
+                  "]",
+                  "\\",
+                  ";",
+                  "'",
+                  ",",
+                  ".",
+                  "/",
+                  "!",
+                  "@",
+                  "#",
+                  "$",
+                  "%",
+                  "^",
+                  "&",
+                  "*",
+                  "(",
+                  ")",
+                  "_",
+                  "+",
+                  "|",
+                  "~",
+                  "{",
+                  "}",
+                  ":",
+                  "<",
+                  ">",
+                  "?"
+                ]
+              },
+              {
+                "type": "string",
+                "enum": [
+                  "escape",
+                  "esc",
+                  "enter",
+                  "return",
+                  "tab",
+                  "space",
+                  "backspace",
+                  "delete",
+                  "insert",
+                  "clear",
+                  "home",
+                  "end",
+                  "pageUp",
+                  "pageDown",
+                  "up",
+                  "down",
+                  "left",
+                  "right",
+                  "f1",
+                  "f2",
+                  "f3",
+                  "f4",
+                  "f5",
+                  "f6",
+                  "f7",
+                  "f8",
+                  "f9",
+                  "f10",
+                  "f11",
+                  "f12"
+                ]
+              }
+            ]
+          },
+          {
+            "type": "string",
+            "pattern": "^(<leader>)((0|1|2|3|4|5|6|7|8|9)|(a|b|c|d|e|f|g|h|i|j|k|l|m|n|o|p|q|r|s|t|u|v|w|x|y|z)|(`|-|=|\\[|\\]|\\\\|;|'|,|\\.|\\/|!|@|#|\\$|%|\\^|&|\\*|\\(|\\)|_|\\+|\\||~|\\{|\\}|:|<|>|\\?)|(escape|esc|enter|return|tab|space|backspace|delete|insert|clear|home|end|pageUp|pageDown|up|down|left|right|f1|f2|f3|f4|f5|f6|f7|f8|f9|f10|f11|f12))$"
+          },
+          {
+            "type": "string",
+            "pattern": "^(ctrl|shift|alt|super)(\\+)((0|1|2|3|4|5|6|7|8|9)|(a|b|c|d|e|f|g|h|i|j|k|l|m|n|o|p|q|r|s|t|u|v|w|x|y|z)|(`|-|=|\\[|\\]|\\\\|;|'|,|\\.|\\/|!|@|#|\\$|%|\\^|&|\\*|\\(|\\)|_|\\+|\\||~|\\{|\\}|:|<|>|\\?)|(escape|esc|enter|return|tab|space|backspace|delete|insert|clear|home|end|pageUp|pageDown|up|down|left|right|f1|f2|f3|f4|f5|f6|f7|f8|f9|f10|f11|f12))$"
+          }
+        ]
+      }
+    }
+  },
+  "required": [
+    "colors",
+    "normalModeRemap",
+    "keybinds"
+  ],
+  "additionalProperties": false
+}
