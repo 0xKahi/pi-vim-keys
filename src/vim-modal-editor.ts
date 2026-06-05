@@ -1,9 +1,10 @@
 import { CustomEditor, type KeybindingsManager } from '@earendil-works/pi-coding-agent';
 import { type EditorTheme, type TUI, truncateToWidth, visibleWidth } from '@earendil-works/pi-tui';
 import type { ConfigLoader } from './config-loader';
+import { KeySequencer } from './key-sequencer';
+import { TimeBasedKeySequence } from './key-sequencer/strategies/time-based-sequnce';
 import type { VimMode } from './types';
 import { crayon } from './utils/crayon.util';
-import { KeySequencer } from './utils/key-sequencer.util';
 
 type VimModalEditorOpts = {
   config: ConfigLoader;
@@ -11,8 +12,10 @@ type VimModalEditorOpts = {
 
 export class VimModalEditor extends CustomEditor {
   private mode: VimMode = 'normal';
-  private keySeq: { toNormalMode: KeySequencer; appKeyBinds: KeySequencer };
-
+  private keySeq: {
+    normal: KeySequencer;
+    insert: KeySequencer;
+  };
   readonly config: ConfigLoader;
 
   kb: KeybindingsManager;
@@ -22,8 +25,8 @@ export class VimModalEditor extends CustomEditor {
     this.kb = keybindings;
     this.config = opts.config;
     this.keySeq = {
-      toNormalMode: new KeySequencer(this.config.toNormalModeSequence),
-      appKeyBinds: new KeySequencer(this.config.leaderKeyAppKeySequences),
+      normal: new KeySequencer([new TimeBasedKeySequence(this.config.leaderKeyAppKeySequences)]),
+      insert: new KeySequencer([new TimeBasedKeySequence(this.config.toNormalModeSequence)]),
     };
   }
 
@@ -58,13 +61,31 @@ export class VimModalEditor extends CustomEditor {
       return;
     }
 
+    if (this.mode === 'normal') {
+      this.handleNormalMode(data);
+      return;
+    }
+
     super.handleInput(data);
   }
 
-  private handleInsertMode(data: string): void {
-    const matchedId = this.keySeq.toNormalMode.match(data);
+  private handleNormalMode(data: string): void {
+    const { result } = this.keySeq.normal.match(data);
 
-    if (matchedId) {
+    if (result === 'pending') {
+      return;
+    }
+
+    if (data === 'i') {
+      this.setMode('insert');
+      return;
+    }
+  }
+
+  private handleInsertMode(data: string): void {
+    const { result } = this.keySeq.insert.match(data);
+
+    if (result === 'completed') {
       this.setMode('normal');
       return;
     }

@@ -31,6 +31,35 @@ const LETTER_KEYS = [
   'z',
 ] as const;
 
+const CAPITAL_LETTER_KEYS = [
+  'A',
+  'B',
+  'C',
+  'D',
+  'E',
+  'F',
+  'G',
+  'H',
+  'I',
+  'J',
+  'K',
+  'L',
+  'M',
+  'N',
+  'O',
+  'P',
+  'Q',
+  'R',
+  'S',
+  'T',
+  'U',
+  'V',
+  'W',
+  'X',
+  'Y',
+  'Z',
+] as const;
+
 const SYMBOL_KEYS = [
   '`',
   '-',
@@ -106,6 +135,9 @@ export type DigitKey = z.infer<typeof DigitKeySchema>;
 export const LetterKeySchema = z.enum(LETTER_KEYS);
 export type LetterKey = z.infer<typeof LetterKeySchema>;
 
+export const CapitalLetterKeySchema = z.enum(CAPITAL_LETTER_KEYS);
+export type CapitalLetterKey = z.infer<typeof CapitalLetterKeySchema>;
+
 export const SymbolKeySchema = z.enum(SYMBOL_KEYS);
 export type SymbolKey = z.infer<typeof SymbolKeySchema>;
 
@@ -115,9 +147,14 @@ export type SpecialKey = z.infer<typeof SpecialKeySchema>;
 export const BaseKeyBindSchema = z.union([DigitKeySchema, LetterKeySchema, SymbolKeySchema, SpecialKeySchema]);
 export type BaseKeyBind = z.infer<typeof BaseKeyBindSchema>;
 
+//** BaseKey Schema with CapitalLetters */
+export const VimBaseKeySchema = z.union([BaseKeyBindSchema, CapitalLetterKeySchema]);
+//** BaseKey with CapitalLetters */
+export type VimBaseKey = z.infer<typeof VimBaseKeySchema>;
+
 export const ModifierKeySchema = z.enum(MODIFIER_KEYS);
 export type ModifierKey = z.infer<typeof ModifierKeySchema>;
 
-export const KeybindWithLeaderKeySchema = z.templateLiteral([z.literal('<leader>'), BaseKeyBindSchema]);
 export const KeybindWithModifierSchema = z.templateLiteral([ModifierKeySchema, z.literal('+'), BaseKeyBindSchema]);
-export const VimKeybindSchema = z.union([BaseKeyBindSchema, KeybindWithLeaderKeySchema, KeybindWithModifierSchema]);
+export const KeybindWithLeaderKeySchema = z.templateLiteral([z.literal('<leader>'), VimBaseKeySchema]);
+export const VimKeybindSchema = z.union([VimBaseKeySchema, KeybindWithLeaderKeySchema, KeybindWithModifierSchema]);

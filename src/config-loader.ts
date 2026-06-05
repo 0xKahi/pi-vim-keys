@@ -1,25 +1,24 @@
 import { readFileSync } from 'node:fs';
 import type { AppKeybinding, ExtensionContext } from '@earendil-works/pi-coding-agent';
-import type { KeyId } from '@earendil-works/pi-tui';
 import { type ZodSafeParseResult, z } from 'zod';
 import { DEFAULT_KEY_TIMEOUT, DEFAULT_LEADER_KEY } from './constants';
+import type { TimeBasedSequenceOpts } from './key-sequencer/strategies/time-based-sequnce';
 import { type PartialPiVimKeysConfig, PartialPiVimKeysConfigSchema, type PiVimKeysConfig, PiVimKeysConfigSchema } from './schemas/config.schema';
-import { BaseKeyBindSchema, KeybindWithLeaderKeySchema } from './schemas/key.schema';
-import type { VimMode } from './types';
-import type { KeySequence } from './utils/key-sequencer.util';
+import { KeybindWithLeaderKeySchema, VimBaseKeySchema } from './schemas/key.schema';
+import type { VimKeyId, VimMode } from './types';
 import { PathUtil } from './utils/path.util';
 
 export class ConfigLoader {
   private config: PiVimKeysConfig;
-  private keyToAppKeybindingMap = new Map<KeyId, AppKeybinding>();
-  private leaderKeyToAppKeybindingMap = new Map<KeyId, AppKeybinding>();
+  private keyToAppKeybindingMap = new Map<VimKeyId, AppKeybinding>();
+  private leaderKeyToAppKeybindingMap = new Map<VimKeyId, AppKeybinding>();
 
   constructor() {
     this.config = this.defaultConfig;
     this.initializeAppKeybindingMaps();
   }
 
-  get toNormalModeSequence(): KeySequence {
+  get toNormalModeSequence(): TimeBasedSequenceOpts {
     if (this.config.normalModeRemap.type === 'single') {
       return {
         leader: this.config.normalModeRemap.key,
@@ -34,8 +33,8 @@ export class ConfigLoader {
     };
   }
 
-  get leaderKeyAppKeySequences(): KeySequence {
-    const sequences: KeyId[] = [];
+  get leaderKeyAppKeySequences(): TimeBasedSequenceOpts {
+    const sequences: VimKeyId[] = [];
     for (const key of this.leaderKeyToAppKeybindingMap.keys()) {
       sequences.push(key);
     }
@@ -54,7 +53,7 @@ export class ConfigLoader {
     return this.config.colors[type];
   }
 
-  getAppKeybindingForKey({ key, leaderKey }: { key: KeyId; leaderKey: boolean }): AppKeybinding | undefined {
+  getAppKeybindingForKey({ key, leaderKey }: { key: VimKeyId; leaderKey: boolean }): AppKeybinding | undefined {
     if (leaderKey) {
       return this.leaderKeyToAppKeybindingMap.get(key);
     }
@@ -116,12 +115,12 @@ export class ConfigLoader {
     for (const [appKeybinding, vimKeybind] of Object.entries(this.config.keybinds) as [AppKeybinding, string][]) {
       if (KeybindWithLeaderKeySchema.safeParse(vimKeybind).success) {
         const key = vimKeybind.slice('<leader>'.length);
-        const res = BaseKeyBindSchema.safeParse(key);
+        const res = VimBaseKeySchema.safeParse(key);
         if (res.success) {
           this.leaderKeyToAppKeybindingMap.set(res.data, appKeybinding);
         }
       } else {
-        this.keyToAppKeybindingMap.set(vimKeybind as KeyId, appKeybinding);
+        this.keyToAppKeybindingMap.set(vimKeybind as VimKeyId, appKeybinding);
       }
     }
   }
