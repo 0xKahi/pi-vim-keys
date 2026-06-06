@@ -9,6 +9,7 @@ import { CharOnlyKeySchema } from './schemas/key.schema';
 import type { VimMode } from './types';
 import { crayon } from './utils/crayon.util';
 import { MovementController } from './utils/editor/movement-controller.util';
+import { TextEditController } from './utils/editor/text-edit-controller.util';
 
 type VimModalEditorOpts = {
   config: ConfigLoader;
@@ -22,6 +23,7 @@ export class VimModalEditor extends CustomEditor {
   };
   readonly config: ConfigLoader;
   private readonly movement: MovementController;
+  private readonly textEdit: TextEditController;
 
   kb: KeybindingsManager;
 
@@ -30,12 +32,18 @@ export class VimModalEditor extends CustomEditor {
     this.kb = keybindings;
     this.config = opts.config;
     this.movement = new MovementController(this);
+    this.textEdit = new TextEditController(this);
     this.registerInsertModeSequences();
     this.registerNormalModeSequences();
   }
 
   get modeLabel(): string {
     if (this.mode === 'insert') return ' INSERT ';
+    if (this.mode === 'normal') {
+      const pendingKey = this.keySeq.normal.pendingKey;
+      if (pendingKey) return ` NORMAL ${pendingKey} `;
+      return ' NORMAL ';
+    }
     return ' NORMAL ';
   }
 
@@ -77,10 +85,12 @@ export class VimModalEditor extends CustomEditor {
     const { result, matched } = this.keySeq.normal.match(data);
 
     if (result === 'pending') {
+      this.tui.requestRender();
       return;
     }
 
     if (result === 'completed' && matched) {
+      this.tui.requestRender();
       if (matched.leader === 'f') {
         this.movement.findChar('forward', data);
         return;
@@ -94,16 +104,31 @@ export class VimModalEditor extends CustomEditor {
       if (matched.leader === 'g' && matched?.seqKey) {
         if (this.handlePendingG(matched.seqKey)) return;
       }
+
+      if (matched.leader === 'd' && matched?.seqKey) {
+        if (this.handlePendingD(matched.seqKey)) return;
+      }
     }
 
     if (this.handleBackToInsertMode(data)) return;
     if (this.handleMovementCommand(data)) return;
+    if (data === 'x') {
+      this.textEdit.delete('forward');
+      return;
+    }
+    if (data === 'X') {
+      this.textEdit.delete('backward');
+      return;
+    }
   }
 
   private handleInsertMode(data: string): void {
     const { result } = this.keySeq.insert.match(data);
 
     if (result === 'completed') {
+      if (this.config.toNormalModeSequence.sequences.length > 0) {
+        this.textEdit.delete('backward');
+      }
       this.setMode('normal');
       return;
     }
@@ -123,12 +148,22 @@ export class VimModalEditor extends CustomEditor {
         return true;
       }
       case 'a': {
-        this.movement.move('left');
+        this.movement.move('right');
         this.setMode('insert');
         return true;
       }
       case 'A': {
         this.movement.leap('end', 'line');
+        this.setMode('insert');
+        return true;
+      }
+      case 'o': {
+        this.textEdit.newLine('down');
+        this.setMode('insert');
+        return true;
+      }
+      case 'O': {
+        this.textEdit.newLine('up');
         this.setMode('insert');
         return true;
       }
@@ -177,6 +212,11 @@ export class VimModalEditor extends CustomEditor {
     return false;
   }
 
+  private handlePendingD(data: string): boolean {
+    if (data === 'd') return this.textEdit.deleteLine();
+    return false;
+  }
+
   private renderModeOnBorder(borderLine: string, width: number): string {
     const label = crayon.reverseVideo(crayon.colorize(this.modeLabel, { fg: this.config.getModeColors(this.mode) }));
     const labelWidth = visibleWidth(label);
@@ -205,6 +245,7 @@ export class VimModalEditor extends CustomEditor {
     this.keySeq.normal.register(new SchemaBasedKeySequence({ leader: 'f', schema: CharOnlyKeySchema }));
     this.keySeq.normal.register(new SchemaBasedKeySequence({ leader: 'F', schema: CharOnlyKeySchema }));
     this.keySeq.normal.register(new MultiCharKeySequence({ leader: 'g', sequences: ['g', 'e', 'E'] }));
+    this.keySeq.normal.register(new MultiCharKeySequence({ leader: 'd', sequences: ['d'] }));
   }
 
   private registerInsertModeSequences() {
