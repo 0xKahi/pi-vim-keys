@@ -32,26 +32,30 @@ export class TimeBasedKeySequence implements KeySequenceStrategy {
     if (this.pendingSequence) {
       this.invalidate();
       if (this.sequences.has(key)) {
-        return { result: 'completed', matchedkey: this.sequences.get(key) };
+        return { result: 'completed', matched: { leader: this.leader, seqKey: this.sequences.get(key) } };
       }
       return { result: 'none' };
     }
 
     if (this.leader === key) {
-      this.save();
+      const isPending = this.save();
       return {
-        result: this.hasSequence ? 'pending' : 'completed',
-        matchedkey: this.hasSequence ? undefined : this.leader,
+        result: isPending ? 'pending' : 'completed',
+        matched: {
+          leader: this.leader,
+        },
       };
     }
     return { result: 'none' };
   }
 
   // update the timestamp if key matches main and has sequence, otherwise return the main key if it matches
-  private save(): void {
+  private save(): boolean {
     if (this.hasSequence) {
       this.timestamp = Date.now();
+      return true;
     }
+    return false;
   }
 
   private invalidate(): void {

@@ -3,14 +3,14 @@ import type { VimKeyId } from '../types';
 
 export type KeySeqMatchRes = {
   result: 'completed' | 'pending' | 'none';
-  matchedkey?: VimKeyId;
+  matched?: { leader: VimKeyId; seqKey?: string };
 };
 
 export interface KeySequenceStrategy {
   /** leader key to start sequence */
   readonly leader: VimKeyId;
   /** keyId as string -> keyId map for easier data parsing */
-  readonly sequences: Map<string, VimKeyId>;
+  // readonly sequences: Map<string, VimKeyId>;
 
   pendingSequence: boolean;
 
@@ -18,11 +18,11 @@ export interface KeySequenceStrategy {
 }
 
 export class KeySequencer {
-  readonly registry: Map<string, KeySequenceStrategy>;
+  private _registry: Map<string, KeySequenceStrategy> = new Map();
   private lastPendingMatch: VimKeyId | null = null;
 
-  constructor(strategies: KeySequenceStrategy[]) {
-    this.registry = new Map(strategies.map(strat => [strat.leader, strat]));
+  get registry(): Map<string, KeySequenceStrategy> {
+    return this._registry;
   }
 
   get pendingKey(): VimKeyId | null {
@@ -52,6 +52,13 @@ export class KeySequencer {
       return data;
     }
     return { result: 'none' };
+  }
+
+  register(strategy: KeySequenceStrategy) {
+    if (this._registry.has(strategy.leader)) {
+      throw new Error(`leaderKey: ${strategy.leader} already registered`);
+    }
+    this._registry.set(strategy.leader, strategy);
   }
 
   private clearPendingMatch() {

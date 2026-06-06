@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import type { AppKeybinding, ExtensionContext } from '@earendil-works/pi-coding-agent';
 import { type ZodSafeParseResult, z } from 'zod';
 import { DEFAULT_KEY_TIMEOUT, DEFAULT_LEADER_KEY } from './constants';
-import type { TimeBasedSequenceOpts } from './key-sequencer/strategies/time-based-sequnce';
+import type { TimeBasedSequenceOpts } from './key-sequencer/strategies/time-based-sequence';
 import { type PartialPiVimKeysConfig, PartialPiVimKeysConfigSchema, type PiVimKeysConfig, PiVimKeysConfigSchema } from './schemas/config.schema';
 import { KeybindWithLeaderKeySchema, VimBaseKeySchema } from './schemas/key.schema';
 import type { VimKeyId, VimMode } from './types';
