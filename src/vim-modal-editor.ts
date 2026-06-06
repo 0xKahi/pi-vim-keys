@@ -1,5 +1,5 @@
 import { CustomEditor, type KeybindingsManager } from '@earendil-works/pi-coding-agent';
-import { type EditorTheme, type TUI, truncateToWidth, visibleWidth } from '@earendil-works/pi-tui';
+import { type EditorTheme, matchesKey, type TUI, truncateToWidth, visibleWidth } from '@earendil-works/pi-tui';
 import type { ConfigLoader } from './config-loader';
 import { KeySequencer } from './key-sequencer';
 import { MultiCharKeySequence } from './key-sequencer/strategies/multi-char-sequence';
@@ -8,9 +8,11 @@ import { TimeBasedKeySequence } from './key-sequencer/strategies/time-based-sequ
 import { CharOnlyKeySchema } from './schemas/key.schema';
 import type { VimMode } from './types';
 import { crayon } from './utils/crayon.util';
+import { EditorCompassController } from './utils/editor/editor-compass-controller.util';
 import { HardwareCursorController } from './utils/editor/hardware-cursor-controller.util';
 import { MovementController } from './utils/editor/movement-controller.util';
 import { TextEditController } from './utils/editor/text-edit-controller.util';
+import { formatModeLabel, isVisualMode } from './utils/vim-mode.util';
 
 type VimModalEditorOpts = {
   config: ConfigLoader;
@@ -18,13 +20,16 @@ type VimModalEditorOpts = {
 
 export class VimModalEditor extends CustomEditor {
   private mode: VimMode = 'normal';
-  private keySeq = {
+  private keySeq: Record<VimMode, KeySequencer> = {
     normal: new KeySequencer(),
     insert: new KeySequencer(),
+    visual: new KeySequencer(),
+    visualLine: new KeySequencer(),
   };
   readonly config: ConfigLoader;
   private readonly movement: MovementController;
   private readonly textEdit: TextEditController;
+  private readonly compass: EditorCompassController;
   private readonly hardwareCursor: HardwareCursorController;
 
   kb: KeybindingsManager;
@@ -35,28 +40,36 @@ export class VimModalEditor extends CustomEditor {
     this.config = opts.config;
     this.movement = new MovementController(this);
     this.textEdit = new TextEditController(this);
+    this.compass = new EditorCompassController(this);
     this.hardwareCursor = new HardwareCursorController(tui);
     this.hardwareCursor.apply(this.mode);
     this.registerInsertModeSequences();
     this.registerNormalModeSequences();
+    this.registerVisualModeSequences();
+    this.registerVisualLineModeSequences();
   }
 
   get modeLabel(): string {
-    if (this.mode === 'insert') return ' INSERT ';
-    if (this.mode === 'normal') {
-      const pendingKey = this.keySeq.normal.pendingKey;
-      if (pendingKey) return ` NORMAL ${pendingKey} `;
-      return ' NORMAL ';
-    }
-    return ' NORMAL ';
+    return formatModeLabel(this.mode, this.keySeq[this.mode]?.pendingKey ?? undefined);
   }
 
-  private setMode(mode: VimMode) {
-    if (this.mode === mode) return;
+  private setMode(mode: VimMode): boolean {
+    const currentMode = this.mode;
+    if (currentMode === mode) return false;
+
+    if (isVisualMode(currentMode)) {
+      this.compass.clearAnchor();
+    }
+
+    if (isVisualMode(mode)) {
+      const anchorType = mode === 'visualLine' ? 'line' : 'cursor';
+      this.compass.anchor(anchorType);
+    }
 
     this.mode = mode;
     this.hardwareCursor.apply(this.mode);
     this.tui.requestRender();
+    return true;
   }
 
   cleanup(): void {
@@ -79,13 +92,43 @@ export class VimModalEditor extends CustomEditor {
   }
 
   override handleInput(data: string): void {
-    if (this.mode === 'insert') {
-      this.handleInsertMode(data);
-      return;
+    switch (this.mode) {
+      case 'insert': {
+        this.handleInsertMode(data);
+        return;
+      }
+      case 'normal': {
+        this.handleNormalMode(data);
+        return;
+      }
+      case 'visual': {
+        this.handleVisualMode(data);
+        return;
+      }
+      case 'visualLine': {
+        this.handleVisualLineMode(data);
+        return;
+      }
+      default: {
+        super.handleInput(data);
+        return;
+      }
     }
+  }
 
-    if (this.mode === 'normal') {
-      this.handleNormalMode(data);
+  private handleInsertMode(data: string): void {
+    const { result } = this.keySeq.insert.match(data);
+
+    if (result === 'completed') {
+      if (this.config.toNormalModeSequence.sequences.length > 0) {
+        // delete char when toNormal Mode Has Sequence
+        // for example keybind -> `kj`
+        // on k text is written  on j sequence will execute so delete first inital key taht was meant for the sequence
+        this.textEdit.delete('backward');
+      }
+      // move back to mimic vim cursor
+      this.movement.move('left');
+      this.setMode('normal');
       return;
     }
 
@@ -122,23 +165,68 @@ export class VimModalEditor extends CustomEditor {
     }
 
     if (this.handleBackToInsertMode(data)) return;
+    if (data === 'v' && this.setMode('visual')) return;
+    if (data === 'V' && this.setMode('visualLine')) return;
     if (this.handleMovementCommand(data)) return;
     if (this.handleNormalEditComands(data)) return;
   }
 
-  private handleInsertMode(data: string): void {
-    const { result } = this.keySeq.insert.match(data);
+  private handleVisualMode(data: string): void {
+    const { result, matched } = this.keySeq.visual.match(data);
 
-    if (result === 'completed') {
-      if (this.config.toNormalModeSequence.sequences.length > 0) {
-        this.textEdit.delete('backward');
-      }
-      this.movement.move('left');
-      this.setMode('normal');
+    if (result === 'pending') {
+      this.tui.requestRender();
       return;
     }
 
-    super.handleInput(data);
+    if (result === 'completed' && matched) {
+      this.tui.requestRender();
+      if (matched.leader === 'f') {
+        this.movement.findChar('forward', data);
+        return;
+      }
+
+      if (matched.leader === 'F') {
+        this.movement.findChar('backward', data);
+        return;
+      }
+
+      if (matched.leader === 'g' && matched?.seqKey) {
+        if (this.handlePendingG(matched.seqKey)) return;
+      }
+    }
+
+    if (this.handleEscapeVisualCommand(data)) return;
+    if (this.handleMovementCommand(data)) return;
+  }
+
+  private handleVisualLineMode(data: string): void {
+    const { result, matched } = this.keySeq.visualLine.match(data);
+
+    if (result === 'pending') {
+      this.tui.requestRender();
+      return;
+    }
+
+    if (result === 'completed' && matched) {
+      this.tui.requestRender();
+      if (matched.leader === 'f') {
+        this.movement.findChar('forward', data);
+        return;
+      }
+
+      if (matched.leader === 'F') {
+        this.movement.findChar('backward', data);
+        return;
+      }
+
+      if (matched.leader === 'g' && matched?.seqKey) {
+        if (this.handlePendingG(matched.seqKey)) return;
+      }
+    }
+
+    if (this.handleEscapeVisualCommand(data)) return;
+    if (this.handleMovementCommand(data)) return;
   }
 
   private handleBackToInsertMode(data: string): boolean {
@@ -218,6 +306,22 @@ export class VimModalEditor extends CustomEditor {
     return false;
   }
 
+  private handleEscapeVisualCommand(data: string): boolean {
+    if (matchesKey(data, 'escape')) return this.setMode('normal');
+
+    if (this.mode === 'visual') {
+      if (data === 'v') return this.setMode('normal');
+      if (data === 'V') return this.setMode('visualLine');
+    }
+
+    if (this.mode === 'visualLine') {
+      if (data === 'v') return this.setMode('visual');
+      if (data === 'V') return this.setMode('normal');
+    }
+
+    return false;
+  }
+
   private handlePendingG(data: string): boolean {
     if (data === 'g') return this.movement.leap('start', 'page');
     if (data === 'e') return this.movement.jumpWord('backward', { pos: 'end', includePunctuation: false });
@@ -253,15 +357,27 @@ export class VimModalEditor extends CustomEditor {
     return -1;
   }
 
+  private registerInsertModeSequences() {
+    this.keySeq.insert.register(new TimeBasedKeySequence(this.config.toNormalModeSequence));
+  }
+
   private registerNormalModeSequences() {
-    this.keySeq.normal.register(new TimeBasedKeySequence(this.config.leaderKeyAppKeySequences));
+    this.keySeq.normal.register(new TimeBasedKeySequence(this.config.leaderKeyAppKeySequences)); //leader key actions
     this.keySeq.normal.register(new SchemaBasedKeySequence({ leader: 'f', schema: CharOnlyKeySchema }));
     this.keySeq.normal.register(new SchemaBasedKeySequence({ leader: 'F', schema: CharOnlyKeySchema }));
     this.keySeq.normal.register(new MultiCharKeySequence({ leader: 'g', sequences: ['g', 'e', 'E'] }));
     this.keySeq.normal.register(new MultiCharKeySequence({ leader: 'd', sequences: ['d'] }));
   }
 
-  private registerInsertModeSequences() {
-    this.keySeq.insert.register(new TimeBasedKeySequence(this.config.toNormalModeSequence));
+  private registerVisualModeSequences() {
+    this.keySeq.visual.register(new SchemaBasedKeySequence({ leader: 'f', schema: CharOnlyKeySchema }));
+    this.keySeq.visual.register(new SchemaBasedKeySequence({ leader: 'F', schema: CharOnlyKeySchema }));
+    this.keySeq.visual.register(new MultiCharKeySequence({ leader: 'g', sequences: ['g', 'e', 'E'] }));
+  }
+
+  private registerVisualLineModeSequences() {
+    this.keySeq.visualLine.register(new SchemaBasedKeySequence({ leader: 'f', schema: CharOnlyKeySchema }));
+    this.keySeq.visualLine.register(new SchemaBasedKeySequence({ leader: 'F', schema: CharOnlyKeySchema }));
+    this.keySeq.visualLine.register(new MultiCharKeySequence({ leader: 'g', sequences: ['g', 'e', 'E'] }));
   }
 }
