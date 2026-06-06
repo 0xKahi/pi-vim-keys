@@ -8,6 +8,7 @@ import { TimeBasedKeySequence } from './key-sequencer/strategies/time-based-sequ
 import { CharOnlyKeySchema } from './schemas/key.schema';
 import type { VimMode } from './types';
 import { crayon } from './utils/crayon.util';
+import { HardwareCursorController } from './utils/editor/hardware-cursor-controller.util';
 import { MovementController } from './utils/editor/movement-controller.util';
 import { TextEditController } from './utils/editor/text-edit-controller.util';
 
@@ -24,6 +25,7 @@ export class VimModalEditor extends CustomEditor {
   readonly config: ConfigLoader;
   private readonly movement: MovementController;
   private readonly textEdit: TextEditController;
+  private readonly hardwareCursor: HardwareCursorController;
 
   kb: KeybindingsManager;
 
@@ -33,6 +35,8 @@ export class VimModalEditor extends CustomEditor {
     this.config = opts.config;
     this.movement = new MovementController(this);
     this.textEdit = new TextEditController(this);
+    this.hardwareCursor = new HardwareCursorController(tui);
+    this.hardwareCursor.apply(this.mode);
     this.registerInsertModeSequences();
     this.registerNormalModeSequences();
   }
@@ -51,11 +55,18 @@ export class VimModalEditor extends CustomEditor {
     if (this.mode === mode) return;
 
     this.mode = mode;
+    this.hardwareCursor.apply(this.mode);
     this.tui.requestRender();
+  }
+
+  cleanup(): void {
+    this.hardwareCursor.restore();
   }
 
   override render(width: number): string[] {
     const lines = super.render(width);
+    this.hardwareCursor.stripFakeCursor(lines);
+
     const borderLineIndex = this.findBottomBorderLineIndex(lines);
 
     if (borderLineIndex === -1) return lines;
@@ -112,14 +123,7 @@ export class VimModalEditor extends CustomEditor {
 
     if (this.handleBackToInsertMode(data)) return;
     if (this.handleMovementCommand(data)) return;
-    if (data === 'x') {
-      this.textEdit.delete('forward');
-      return;
-    }
-    if (data === 'X') {
-      this.textEdit.delete('backward');
-      return;
-    }
+    if (this.handleNormalEditComands(data)) return;
   }
 
   private handleInsertMode(data: string): void {
@@ -129,6 +133,7 @@ export class VimModalEditor extends CustomEditor {
       if (this.config.toNormalModeSequence.sequences.length > 0) {
         this.textEdit.delete('backward');
       }
+      this.movement.move('left');
       this.setMode('normal');
       return;
     }
@@ -203,6 +208,14 @@ export class VimModalEditor extends CustomEditor {
       default:
         return false;
     }
+  }
+
+  private handleNormalEditComands(data: string): boolean {
+    if (data === 'x') return this.textEdit.delete('forward');
+    if (data === 'X') return this.textEdit.delete('backward');
+    if (data === 'u') return this.textEdit.undo();
+    if (data === 'U') return this.textEdit.redo();
+    return false;
   }
 
   private handlePendingG(data: string): boolean {

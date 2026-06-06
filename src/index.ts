@@ -3,6 +3,8 @@ import { ConfigLoader } from './config-loader';
 import { VimModalEditor } from './vim-modal-editor';
 
 export default function (pi: ExtensionAPI) {
+  let cleanupEditor = () => {};
+
   pi.on('session_start', (_event, ctx) => {
     const config = new ConfigLoader();
 
@@ -12,8 +14,17 @@ export default function (pi: ExtensionAPI) {
     }
 
     ctx.ui.setEditorComponent((tui, theme, kb) => {
+      cleanupEditor();
+
       const editor = new VimModalEditor(tui, theme, kb, { config });
+      cleanupEditor = () => editor.cleanup();
+
       return editor;
     });
+  });
+
+  pi.on('session_shutdown', () => {
+    cleanupEditor();
+    cleanupEditor = () => {};
   });
 }
