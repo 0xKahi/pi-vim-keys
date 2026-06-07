@@ -1,4 +1,5 @@
 import type { Editor } from '@earendil-works/pi-tui';
+import { getEditorInternals } from './types';
 
 export type BasicDirection = 'left' | 'right' | 'up' | 'down';
 export type JumpPos = 'start' | 'end';
@@ -8,19 +9,6 @@ export type LeapType = 'line' | 'page';
 export type JumpWordOptions = {
   pos: JumpPos;
   includePunctuation: boolean;
-};
-
-type EditorWithInternals = {
-  state?: {
-    lines: string[];
-    cursorLine: number;
-    cursorCol: number;
-  };
-  tui?: { requestRender?: () => void };
-  lastAction?: unknown;
-  preferredVisualCol?: number | null;
-  snappedFromCursorCol?: number | null;
-  moveCursor?: (deltaLine: number, deltaCol: number) => void;
 };
 
 type Position = {
@@ -120,7 +108,7 @@ export class MovementController {
   }
 
   private callNativeMove(deltaLine: number, deltaCol: number): void {
-    const internal = this.editor as unknown as EditorWithInternals;
+    const internal = getEditorInternals(this.editor);
 
     if (typeof internal.moveCursor === 'function') {
       internal.moveCursor(deltaLine, deltaCol);
@@ -194,7 +182,7 @@ export class MovementController {
   }
 
   private setCursor(position: Position): void {
-    const internal = this.editor as unknown as EditorWithInternals;
+    const internal = getEditorInternals(this.editor);
     const state = internal.state;
     if (!state) return;
 
@@ -218,7 +206,7 @@ export class MovementController {
   }
 
   private requestRender(): void {
-    (this.editor as unknown as EditorWithInternals).tui?.requestRender?.();
+    getEditorInternals(this.editor).tui?.requestRender?.();
   }
 
   private compare(a: Position, b: Position): number {

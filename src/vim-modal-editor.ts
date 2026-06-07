@@ -1,6 +1,11 @@
-import { CustomEditor, type KeybindingsManager } from '@earendil-works/pi-coding-agent';
+import { CustomEditor, type KeybindingsManager, type Theme } from '@earendil-works/pi-coding-agent';
 import { type EditorTheme, matchesKey, type TUI, truncateToWidth, visibleWidth } from '@earendil-works/pi-tui';
 import type { ConfigLoader } from './config-loader';
+import { EditorCompassController } from './editor/editor-compass-controller';
+import { HardwareCursorController } from './editor/hardware-cursor-controller';
+import { MovementController } from './editor/movement-controller';
+import { TextEditController } from './editor/text-edit-controller';
+import { VisualHighlightRenderer } from './editor/visual-highlight-renderer';
 import { KeySequencer } from './key-sequencer';
 import { MultiCharKeySequence } from './key-sequencer/strategies/multi-char-sequence';
 import { SchemaBasedKeySequence } from './key-sequencer/strategies/schema-based-sequence';
@@ -8,14 +13,11 @@ import { TimeBasedKeySequence } from './key-sequencer/strategies/time-based-sequ
 import { CharOnlyKeySchema } from './schemas/key.schema';
 import type { VimMode } from './types';
 import { crayon } from './utils/crayon.util';
-import { EditorCompassController } from './utils/editor/editor-compass-controller.util';
-import { HardwareCursorController } from './utils/editor/hardware-cursor-controller.util';
-import { MovementController } from './utils/editor/movement-controller.util';
-import { TextEditController } from './utils/editor/text-edit-controller.util';
 import { formatModeLabel, isVisualMode } from './utils/vim-mode.util';
 
 type VimModalEditorOpts = {
   config: ConfigLoader;
+  getTheme: () => Theme;
 };
 
 export class VimModalEditor extends CustomEditor {
@@ -27,9 +29,11 @@ export class VimModalEditor extends CustomEditor {
     visualLine: new KeySequencer(),
   };
   readonly config: ConfigLoader;
+  private readonly getTheme: () => Theme;
   private readonly movement: MovementController;
   private readonly textEdit: TextEditController;
   private readonly compass: EditorCompassController;
+  private readonly visualHighlight: VisualHighlightRenderer;
   private readonly hardwareCursor: HardwareCursorController;
 
   kb: KeybindingsManager;
@@ -38,9 +42,11 @@ export class VimModalEditor extends CustomEditor {
     super(tui, theme, keybindings);
     this.kb = keybindings;
     this.config = opts.config;
+    this.getTheme = opts.getTheme;
     this.movement = new MovementController(this);
     this.textEdit = new TextEditController(this);
     this.compass = new EditorCompassController(this);
+    this.visualHighlight = new VisualHighlightRenderer(this);
     this.hardwareCursor = new HardwareCursorController(tui);
     this.hardwareCursor.apply(this.mode);
     this.registerInsertModeSequences();
@@ -79,6 +85,15 @@ export class VimModalEditor extends CustomEditor {
   override render(width: number): string[] {
     const lines = super.render(width);
     this.hardwareCursor.stripFakeCursor(lines);
+
+    if (isVisualMode(this.mode)) {
+      this.visualHighlight.render({
+        lines,
+        width,
+        range: this.compass.getAnchoredRange(),
+        style: text => this.getTheme().bg('selectedBg', text),
+      });
+    }
 
     const borderLineIndex = this.findBottomBorderLineIndex(lines);
 

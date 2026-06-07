@@ -1,38 +1,12 @@
 import type { Editor } from '@earendil-works/pi-tui';
+import { type EditorInternals, type EditorState, getEditorInternals } from './types';
 
 export type NewLineDirection = 'up' | 'down';
 export type DeleteDirection = 'forward' | 'backward';
 
-type EditorState = {
-  lines: string[];
-  cursorLine: number;
-  cursorCol: number;
-};
-
-type UndoStackLike = {
-  push: (state: EditorState) => void;
-  pop: () => EditorState | undefined;
-  clear?: () => void;
-  length?: number;
-};
-
 type RedoEntry = {
   before: EditorState;
   after: EditorState;
-};
-
-type EditorWithInternals = {
-  state?: EditorState;
-  tui?: { requestRender?: () => void };
-  onChange?: (text: string) => void;
-  lastAction?: unknown;
-  historyIndex?: number;
-  preferredVisualCol?: number | null;
-  snappedFromCursorCol?: number | null;
-  undoStack?: UndoStackLike;
-  pushUndoSnapshot?: () => void;
-  cancelAutocomplete?: () => void;
-  segment?: (text: string, mode: 'grapheme' | 'word') => Iterable<Intl.SegmentData>;
 };
 
 /**
@@ -307,8 +281,8 @@ export class TextEditController {
     return this.getInternal().state;
   }
 
-  private getInternal(): EditorWithInternals {
-    return this.editor as unknown as EditorWithInternals;
+  private getInternal(): EditorInternals {
+    return getEditorInternals(this.editor);
   }
 
   private cloneState(state: EditorState): EditorState {

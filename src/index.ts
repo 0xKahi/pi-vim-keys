@@ -16,7 +16,7 @@ export default function (pi: ExtensionAPI) {
     ctx.ui.setEditorComponent((tui, theme, kb) => {
       cleanupEditor();
 
-      const editor = new VimModalEditor(tui, theme, kb, { config });
+      const editor = new VimModalEditor(tui, theme, kb, { config, getTheme: () => ctx.ui.theme });
       cleanupEditor = () => editor.cleanup();
 
       return editor;

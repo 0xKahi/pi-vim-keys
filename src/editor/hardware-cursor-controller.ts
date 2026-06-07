@@ -1,5 +1,5 @@
 import { CURSOR_MARKER, type TUI } from '@earendil-works/pi-tui';
-import type { VimMode } from '../../types';
+import type { VimMode } from '../types';
 
 const HARDWARE_CURSOR_SHAPES = {
   normal: '\x1b[2 q', // steady block
