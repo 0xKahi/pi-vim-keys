@@ -22,7 +22,7 @@ const EDITOR_THEME: EditorTheme = {
 };
 
 function makeEditor(text: string, paddingX: number, rows = 30): Editor {
-  const terminal = { rows, columns: 200, write() {}, on() {}, off() {} };
+  const terminal = { rows, columns: 200, write() {}, on() {}, off() {}, hideCursor() {}, showCursor() {} };
   const tui = new TUI(terminal as unknown as ConstructorParameters<typeof TUI>[0], false);
   const editor = new Editor(tui, EDITOR_THEME, { paddingX });
   editor.setText(text);

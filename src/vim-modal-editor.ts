@@ -139,7 +139,7 @@ export class VimModalEditor extends CustomEditor {
         // delete char when toNormal Mode Has Sequence
         // for example keybind -> `kj`
         // on k text is written  on j sequence will execute so delete first inital key taht was meant for the sequence
-        this.textEdit.delete('backward');
+        this.textEdit.delete('backward', { saveToRegister: false });
       }
       // move back to mimic vim cursor
       this.movement.move('left');
@@ -176,6 +176,10 @@ export class VimModalEditor extends CustomEditor {
 
       if (matched.leader === 'd' && matched?.seqKey) {
         if (this.handlePendingD(matched.seqKey)) return;
+      }
+
+      if (matched.leader === 'y' && matched?.seqKey) {
+        if (this.handlePendingY(matched.seqKey)) return;
       }
     }
 
@@ -320,6 +324,8 @@ export class VimModalEditor extends CustomEditor {
     if (data === 'X') return this.textEdit.delete('backward');
     if (data === 'u') return this.textEdit.undo();
     if (data === 'U') return this.textEdit.redo();
+    if (data === 'p') return this.textEdit.paste('forward');
+    if (data === 'P') return this.textEdit.paste('backward');
     return false;
   }
 
@@ -330,6 +336,22 @@ export class VimModalEditor extends CustomEditor {
       this.textEdit.deleteRange(range);
       return this.setMode('normal');
     }
+
+    if (data === 'y') {
+      const range = this.compass.getAnchoredRange();
+      if (!range) return false;
+      this.textEdit.yankRange(range);
+      return this.setMode('normal');
+    }
+
+    if (data === 'p') {
+      const range = this.compass.getAnchoredRange();
+      if (!range) return false;
+      this.textEdit.deleteRange(range, { saveToRegister: false });
+      this.textEdit.paste('forward');
+      return this.setMode('normal');
+    }
+
     return false;
   }
 
@@ -358,6 +380,11 @@ export class VimModalEditor extends CustomEditor {
 
   private handlePendingD(data: string): boolean {
     if (data === 'd') return this.textEdit.deleteLine();
+    return false;
+  }
+
+  private handlePendingY(data: string): boolean {
+    if (data === 'y') return this.textEdit.yankLine();
     return false;
   }
 
@@ -394,6 +421,7 @@ export class VimModalEditor extends CustomEditor {
     this.keySeq.normal.register(new SchemaBasedKeySequence({ leader: 'F', schema: CharOnlyKeySchema }));
     this.keySeq.normal.register(new MultiCharKeySequence({ leader: 'g', sequences: ['g', 'e', 'E'] }));
     this.keySeq.normal.register(new MultiCharKeySequence({ leader: 'd', sequences: ['d'] }));
+    this.keySeq.normal.register(new MultiCharKeySequence({ leader: 'y', sequences: ['y'] }));
   }
 
   private registerVisualModeSequences() {

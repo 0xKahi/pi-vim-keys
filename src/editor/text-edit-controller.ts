@@ -4,6 +4,17 @@ import { type EditorInternals, type EditorState, getEditorInternals } from './ty
 
 export type NewLineDirection = 'up' | 'down';
 export type DeleteDirection = 'forward' | 'backward';
+export type PasteDirection = 'forward' | 'backward';
+export type RegisterType = 'character' | 'line';
+
+type DeleteOptions = {
+  saveToRegister?: boolean;
+};
+
+type RegisterEntry = {
+  type: RegisterType;
+  lines: string[];
+};
 
 type RedoEntry = {
   before: EditorState;
@@ -20,26 +31,50 @@ type RedoEntry = {
 export class TextEditController {
   private readonly fallbackUndoStack: EditorState[] = [];
   private redoStack: RedoEntry[] = [];
+  private register?: RegisterEntry;
 
   constructor(private readonly editor: Editor) {}
 
-  delete(direction: DeleteDirection): boolean {
-    return direction === 'forward' ? this.deleteForward() : this.deleteBackward();
+  delete(direction: DeleteDirection, opts: DeleteOptions = { saveToRegister: true }): boolean {
+    return direction === 'forward' ? this.deleteForward(opts) : this.deleteBackward(opts);
   }
 
-  deleteRange(range: EditorAnchoredRange | undefined): boolean {
+  deleteRange(range: EditorAnchoredRange | undefined, opts: DeleteOptions = { saveToRegister: true }): boolean {
     if (!range) return false;
 
     const state = this.getState();
     if (!state) return false;
 
     this.normalizeState(state);
+    if (opts.saveToRegister) {
+      this.yankRangeToRegister(range, state);
+    }
 
     if (range.type === 'line') {
       return this.deleteLineSpan(range.start.line, range.end.line, state);
     }
 
     return this.deleteCharacterSpan(range.start, range.end, state);
+  }
+
+  yankRange(range: EditorAnchoredRange | undefined): boolean {
+    if (!range) return false;
+
+    const state = this.getState();
+    if (!state) return false;
+
+    this.normalizeState(state);
+    return this.yankRangeToRegister(range, state);
+  }
+
+  yankLine(): boolean {
+    const state = this.getState();
+    if (!state) return false;
+
+    this.normalizeState(state);
+    const line = state.lines[state.cursorLine] ?? '';
+    this.setRegister({ type: 'line', lines: [line] });
+    return true;
   }
 
   deleteLine(): boolean {
@@ -51,6 +86,7 @@ export class TextEditController {
     if (state.lines.length === 1) {
       if ((state.lines[0] ?? '') === '' && state.cursorCol === 0) return false;
 
+      this.setRegister({ type: 'line', lines: [state.lines[0] ?? ''] });
       this.startEdit();
       state.lines = [''];
       state.cursorLine = 0;
@@ -60,12 +96,20 @@ export class TextEditController {
     }
 
     const oldCol = state.cursorCol;
+    this.setRegister({ type: 'line', lines: [state.lines[state.cursorLine] ?? ''] });
     this.startEdit();
     state.lines.splice(state.cursorLine, 1);
     state.cursorLine = this.clamp(state.cursorLine, 0, state.lines.length - 1);
     this.setCursorCol(Math.min(oldCol, (state.lines[state.cursorLine] ?? '').length));
     this.finishEdit();
     return true;
+  }
+
+  paste(direction: PasteDirection): boolean {
+    if (!this.register) return false;
+
+    if (this.register.type === 'line') return this.pasteLinewiseRegister(direction);
+    return this.pasteText(this.register.lines.join('\n'), direction);
   }
 
   newLine(direction: NewLineDirection, wrap = false): boolean {
@@ -126,6 +170,138 @@ export class TextEditController {
     return true;
   }
 
+  private pasteText(text: string, direction: PasteDirection): boolean {
+    const state = this.getState();
+    if (!state || !text) return false;
+
+    this.normalizeState(state);
+
+    const insertion = this.getPasteInsertionCoordinate(state, direction);
+
+    this.startEdit();
+    state.cursorLine = insertion.line;
+    this.setCursorCol(insertion.col);
+
+    const end = this.insertTextAtCursor(text, state);
+    this.setCursorToLastInsertedGrapheme(end, state);
+    this.finishEdit();
+    return true;
+  }
+
+  private yankRangeToRegister(range: EditorAnchoredRange, state: EditorState): boolean {
+    if (range.type === 'line') {
+      const lines = this.getLineSpanLines(range.start.line, range.end.line, state);
+      this.setRegister({ type: 'line', lines });
+      return true;
+    }
+
+    const lines = this.getCharacterSpanLines(range.start, range.end, state);
+    if (!lines) return false;
+
+    this.setRegister({ type: 'character', lines });
+    return true;
+  }
+
+  private pasteLinewiseRegister(direction: PasteDirection): boolean {
+    const state = this.getState();
+    if (!state || !this.register || this.register.type !== 'line') return false;
+
+    this.normalizeState(state);
+    const lines = [...this.register.lines];
+    if (lines.length === 0) return false;
+
+    const insertAt = direction === 'backward' ? state.cursorLine : state.cursorLine + 1;
+
+    this.startEdit();
+    state.lines.splice(insertAt, 0, ...lines);
+    state.cursorLine = insertAt;
+    this.setCursorCol(0);
+    this.finishEdit();
+    return true;
+  }
+
+  private setRegister(entry: RegisterEntry): void {
+    this.register = { type: entry.type, lines: [...entry.lines] };
+  }
+
+  private getLineSpanLines(startLine: number, endLine: number, state: EditorState): string[] {
+    const normalizedStartLine = this.clamp(Math.floor(startLine), 0, state.lines.length - 1);
+    const normalizedEndLine = this.clamp(Math.floor(endLine), 0, state.lines.length - 1);
+    const from = Math.min(normalizedStartLine, normalizedEndLine);
+    const to = Math.max(normalizedStartLine, normalizedEndLine);
+    return state.lines.slice(from, to + 1);
+  }
+
+  private getCharacterSpanLines(start: EditorCoordinate, end: EditorCoordinate, state: EditorState): string[] | undefined {
+    if (start.line > end.line || (start.line === end.line && start.col >= end.col)) return undefined;
+
+    if (start.line === end.line) {
+      return [(state.lines[start.line] ?? '').slice(start.col, end.col)];
+    }
+
+    const parts: string[] = [(state.lines[start.line] ?? '').slice(start.col)];
+
+    for (let line = start.line + 1; line < end.line; line++) {
+      parts.push(state.lines[line] ?? '');
+    }
+
+    parts.push((state.lines[end.line] ?? '').slice(0, end.col));
+    return parts;
+  }
+
+  private getPasteInsertionCoordinate(state: EditorState, direction: PasteDirection): EditorCoordinate {
+    if (direction === 'backward') return { line: state.cursorLine, col: state.cursorCol };
+
+    const line = state.lines[state.cursorLine] ?? '';
+    if (line.length === 0 || state.cursorCol >= line.length) return { line: state.cursorLine, col: line.length };
+
+    const afterCursor = line.slice(state.cursorCol);
+    const firstGrapheme = this.segment(afterCursor)[0];
+    return {
+      line: state.cursorLine,
+      col: state.cursorCol + (firstGrapheme?.segment.length ?? 1),
+    };
+  }
+
+  private insertTextAtCursor(text: string, state: EditorState): EditorCoordinate {
+    const insertedLines = text.split('\n');
+    const startLine = state.cursorLine;
+    const currentLine = state.lines[startLine] ?? '';
+    const beforeCursor = currentLine.slice(0, state.cursorCol);
+    const afterCursor = currentLine.slice(state.cursorCol);
+
+    if (insertedLines.length === 1) {
+      state.lines[startLine] = beforeCursor + text + afterCursor;
+      this.setCursorCol(state.cursorCol + text.length);
+      return { line: state.cursorLine, col: state.cursorCol };
+    }
+
+    const lastInsertedLine = insertedLines[insertedLines.length - 1] ?? '';
+    state.lines = [
+      ...state.lines.slice(0, startLine),
+      beforeCursor + (insertedLines[0] ?? ''),
+      ...insertedLines.slice(1, -1),
+      lastInsertedLine + afterCursor,
+      ...state.lines.slice(startLine + 1),
+    ];
+    state.cursorLine = startLine + insertedLines.length - 1;
+    this.setCursorCol(lastInsertedLine.length);
+    return { line: state.cursorLine, col: state.cursorCol };
+  }
+
+  private setCursorToLastInsertedGrapheme(end: EditorCoordinate, state: EditorState): void {
+    state.cursorLine = end.line;
+    this.setCursorCol(end.col);
+
+    if (end.col === 0) return;
+
+    const line = state.lines[end.line] ?? '';
+    const beforeCursor = line.slice(0, end.col);
+    const graphemes = this.segment(beforeCursor);
+    const lastGrapheme = graphemes[graphemes.length - 1];
+    if (lastGrapheme) this.setCursorCol(lastGrapheme.index);
+  }
+
   private deleteLineSpan(startLine: number, endLine: number, state: EditorState): boolean {
     const normalizedStartLine = this.clamp(Math.floor(startLine), 0, state.lines.length - 1);
     const normalizedEndLine = this.clamp(Math.floor(endLine), 0, state.lines.length - 1);
@@ -176,7 +352,7 @@ export class TextEditController {
     return true;
   }
 
-  private deleteBackward(): boolean {
+  private deleteBackward(opts: DeleteOptions): boolean {
     const state = this.getState();
     if (!state) return false;
 
@@ -189,6 +365,7 @@ export class TextEditController {
       const lastGrapheme = graphemes[graphemes.length - 1];
       const deleteFrom = lastGrapheme?.index ?? state.cursorCol - 1;
 
+      if (opts.saveToRegister) this.setRegister({ type: 'character', lines: [line.slice(deleteFrom, state.cursorCol)] });
       this.startEdit();
       state.lines[state.cursorLine] = line.slice(0, deleteFrom) + line.slice(state.cursorCol);
       this.setCursorCol(deleteFrom);
@@ -198,6 +375,7 @@ export class TextEditController {
 
     if (state.cursorLine === 0) return false;
 
+    if (opts.saveToRegister) this.setRegister({ type: 'character', lines: ['', ''] });
     this.startEdit();
     const currentLine = state.lines[state.cursorLine] ?? '';
     const previousLine = state.lines[state.cursorLine - 1] ?? '';
@@ -209,7 +387,7 @@ export class TextEditController {
     return true;
   }
 
-  private deleteForward(): boolean {
+  private deleteForward(opts: DeleteOptions): boolean {
     const state = this.getState();
     if (!state) return false;
 
@@ -222,6 +400,7 @@ export class TextEditController {
       const firstGrapheme = graphemes[0];
       const deleteTo = state.cursorCol + (firstGrapheme?.segment.length ?? 1);
 
+      if (opts.saveToRegister) this.setRegister({ type: 'character', lines: [line.slice(state.cursorCol, deleteTo)] });
       this.startEdit();
       state.lines[state.cursorLine] = line.slice(0, state.cursorCol) + line.slice(deleteTo);
       this.finishEdit();
@@ -230,6 +409,7 @@ export class TextEditController {
 
     if (state.cursorLine >= state.lines.length - 1) return false;
 
+    if (opts.saveToRegister) this.setRegister({ type: 'character', lines: ['', ''] });
     this.startEdit();
     const nextLine = state.lines[state.cursorLine + 1] ?? '';
     state.lines[state.cursorLine] = line + nextLine;

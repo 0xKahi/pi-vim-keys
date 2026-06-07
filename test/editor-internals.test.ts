@@ -18,7 +18,7 @@ const EDITOR_THEME: EditorTheme = {
 };
 
 function makeEditor(): Editor {
-  const terminal = { rows: 30, columns: 120, write() {}, on() {}, off() {} };
+  const terminal = { rows: 30, columns: 120, write() {}, on() {}, off() {}, hideCursor() {}, showCursor() {} };
   const tui = new TUI(terminal as unknown as ConstructorParameters<typeof TUI>[0], false);
   const editor = new Editor(tui, EDITOR_THEME, { paddingX: 1 });
   // Initialize lazily-set fields (scrollOffset/lastWidth) the way production does.
