@@ -1,4 +1,5 @@
 import type { Editor } from '@earendil-works/pi-tui';
+import type { EditorAnchoredRange, EditorCoordinate } from './editor-compass-controller';
 import { type EditorInternals, type EditorState, getEditorInternals } from './types';
 
 export type NewLineDirection = 'up' | 'down';
@@ -24,6 +25,21 @@ export class TextEditController {
 
   delete(direction: DeleteDirection): boolean {
     return direction === 'forward' ? this.deleteForward() : this.deleteBackward();
+  }
+
+  deleteRange(range: EditorAnchoredRange | undefined): boolean {
+    if (!range) return false;
+
+    const state = this.getState();
+    if (!state) return false;
+
+    this.normalizeState(state);
+
+    if (range.type === 'line') {
+      return this.deleteLineSpan(range.start.line, range.end.line, state);
+    }
+
+    return this.deleteCharacterSpan(range.start, range.end, state);
   }
 
   deleteLine(): boolean {
@@ -107,6 +123,56 @@ export class TextEditController {
 
     this.pushUndoSnapshot();
     this.applySnapshot(entry.after);
+    return true;
+  }
+
+  private deleteLineSpan(startLine: number, endLine: number, state: EditorState): boolean {
+    const normalizedStartLine = this.clamp(Math.floor(startLine), 0, state.lines.length - 1);
+    const normalizedEndLine = this.clamp(Math.floor(endLine), 0, state.lines.length - 1);
+    const deleteFrom = Math.min(normalizedStartLine, normalizedEndLine);
+    const deleteTo = Math.max(normalizedStartLine, normalizedEndLine);
+    const deleteCount = deleteTo - deleteFrom + 1;
+
+    if (state.lines.length === 1 && (state.lines[0] ?? '') === '' && state.cursorCol === 0) return false;
+
+    this.startEdit();
+
+    if (deleteCount >= state.lines.length) {
+      state.lines = [''];
+      state.cursorLine = 0;
+      this.setCursorCol(0);
+      this.finishEdit();
+      return true;
+    }
+
+    state.lines.splice(deleteFrom, deleteCount);
+    state.cursorLine = this.clamp(deleteFrom, 0, state.lines.length - 1);
+    this.setCursorCol(0);
+    this.finishEdit();
+    return true;
+  }
+
+  private deleteCharacterSpan(start: EditorCoordinate, end: EditorCoordinate, state: EditorState): boolean {
+    if (start.line > end.line || (start.line === end.line && start.col >= end.col)) return false;
+
+    this.startEdit();
+
+    if (start.line === end.line) {
+      const line = state.lines[start.line] ?? '';
+      state.lines[start.line] = line.slice(0, start.col) + line.slice(end.col);
+      state.cursorLine = start.line;
+      this.setCursorCol(start.col);
+      this.finishEdit();
+      return true;
+    }
+
+    const startLine = state.lines[start.line] ?? '';
+    const endLine = state.lines[end.line] ?? '';
+    state.lines[start.line] = startLine.slice(0, start.col) + endLine.slice(end.col);
+    state.lines.splice(start.line + 1, end.line - start.line);
+    state.cursorLine = start.line;
+    this.setCursorCol(start.col);
+    this.finishEdit();
     return true;
   }
 
