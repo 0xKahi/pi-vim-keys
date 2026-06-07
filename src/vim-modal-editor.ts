@@ -213,6 +213,7 @@ export class VimModalEditor extends CustomEditor {
 
     if (this.handleEscapeVisualCommand(data)) return;
     if (this.handleMovementCommand(data)) return;
+    if (this.handleVisualEditCommands(data)) return;
   }
 
   private handleVisualLineMode(data: string): void {
@@ -242,6 +243,7 @@ export class VimModalEditor extends CustomEditor {
 
     if (this.handleEscapeVisualCommand(data)) return;
     if (this.handleMovementCommand(data)) return;
+    if (this.handleVisualEditCommands(data)) return;
   }
 
   private handleBackToInsertMode(data: string): boolean {
@@ -318,6 +320,16 @@ export class VimModalEditor extends CustomEditor {
     if (data === 'X') return this.textEdit.delete('backward');
     if (data === 'u') return this.textEdit.undo();
     if (data === 'U') return this.textEdit.redo();
+    return false;
+  }
+
+  private handleVisualEditCommands(data: string): boolean {
+    if (['x', 'd'].includes(data)) {
+      const range = this.compass.getAnchoredRange();
+      if (!range) return false;
+      this.textEdit.deleteRange(range);
+      return this.setMode('normal');
+    }
     return false;
   }
 
