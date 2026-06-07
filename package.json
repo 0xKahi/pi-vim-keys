@@ -19,20 +19,16 @@
     ]
   },
   "scripts": {
-    "biome": "biome check ./src",
+    "biome": "biome check ./src ./test",
     "lint": "bun biome",
     "lint:fix": "bun biome --write",
     "type-check": "tsc --noEmit",
+    "test": "bun test",
     "check": "bun run lint:fix && bun run type-check",
     "release": "changeset publish",
     "version": "changeset version",
     "changeset": "changeset",
     "buildSchema": "bun run scripts/build-schema.ts"
-  },
-  "peerDependencies": {
-    "@earendil-works/pi-ai": "*",
-    "@earendil-works/pi-coding-agent": "*",
-    "@earendil-works/pi-tui": "*"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.15",
@@ -42,6 +38,9 @@
     "typescript": "^5"
   },
   "dependencies": {
-    "zod": "^4.4.3"
+    "zod": "^4.4.3",
+    "@earendil-works/pi-ai": "^0.78.1",
+    "@earendil-works/pi-coding-agent": "^0.78.1",
+    "@earendil-works/pi-tui": "^0.78.1"
   }
 }

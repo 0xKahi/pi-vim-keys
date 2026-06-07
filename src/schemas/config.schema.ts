@@ -8,6 +8,8 @@ const HtmlColorInputSchema = z.string().regex(COLOR_HEX_REGEX, { message: 'Inval
 const ModeColorConfigSchema = z.object({
   normal: HtmlColorInputSchema.optional().default('#55BBF9'),
   insert: HtmlColorInputSchema.optional().default('#72F6B2'),
+  visual: HtmlColorInputSchema.optional().default('#D498F8'),
+  visualLine: HtmlColorInputSchema.optional().default('#D498F8'),
 });
 
 const NormalModeSingleKeySchema = z.object({
@@ -30,6 +32,8 @@ export const PiVimKeysConfigSchema = z.object({
   colors: ModeColorConfigSchema.default({
     normal: '#55BBF9',
     insert: '#72F6B2',
+    visual: '#D498F8',
+    visualLine: '#D498F8',
   }),
   normalModeRemap: NormalModeConfigSchema.default({
     type: 'single',

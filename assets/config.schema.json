@@ -11,7 +11,9 @@
     "colors": {
       "default": {
         "normal": "#55BBF9",
-        "insert": "#72F6B2"
+        "insert": "#72F6B2",
+        "visual": "#D498F8",
+        "visualLine": "#D498F8"
       },
       "type": "object",
       "properties": {
@@ -24,11 +26,23 @@
           "default": "#72F6B2",
           "type": "string",
           "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "visual": {
+          "default": "#D498F8",
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "visualLine": {
+          "default": "#D498F8",
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
         }
       },
       "required": [
         "normal",
-        "insert"
+        "insert",
+        "visual",
+        "visualLine"
       ],
       "additionalProperties": false
     },
