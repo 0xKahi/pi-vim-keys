@@ -28,7 +28,7 @@ describe('TextEditController.paste', () => {
   it('returns false when the register is empty', () => {
     const editor = makeEditor('abc');
 
-    expect(new TextEditController(editor).paste()).toBe(false);
+    expect(new TextEditController(editor).paste('forward')).toBe(false);
     expect(editor.getText()).toBe('abc');
   });
 
@@ -39,7 +39,7 @@ describe('TextEditController.paste', () => {
 
     expect(textEdit.delete('forward', { saveToRegister: true })).toBe(true);
     expect(editor.getText()).toBe('ac');
-    expect(textEdit.paste('before')).toBe(true);
+    expect(textEdit.paste('backward')).toBe(true);
 
     expect(editor.getText()).toBe('abc');
     expect(editor.getCursor()).toEqual({ line: 0, col: 1 });
@@ -52,7 +52,7 @@ describe('TextEditController.paste', () => {
 
     expect(textEdit.deleteLine()).toBe(true);
     expect(editor.getText()).toBe('one\nthree');
-    expect(textEdit.paste('after')).toBe(true);
+    expect(textEdit.paste('forward')).toBe(true);
 
     expect(editor.getText()).toBe('one\nthree\ntwo');
     expect(editor.getCursor()).toEqual({ line: 2, col: 0 });

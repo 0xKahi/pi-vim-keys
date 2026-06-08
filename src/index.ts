@@ -5,6 +5,10 @@ import { VimModalEditor } from './vim-modal-editor';
 export default function (pi: ExtensionAPI) {
   let cleanupEditor = () => {};
 
+  const emitEvent = (channel: string, data?: unknown) => {
+    pi.events.emit(channel, data);
+  };
+
   pi.on('session_start', (_event, ctx) => {
     const config = new ConfigLoader();
 
@@ -16,7 +20,7 @@ export default function (pi: ExtensionAPI) {
     ctx.ui.setEditorComponent((tui, theme, kb) => {
       cleanupEditor();
 
-      const editor = new VimModalEditor(tui, theme, kb, { config, getTheme: () => ctx.ui.theme });
+      const editor = new VimModalEditor(tui, theme, kb, { config, getTheme: () => ctx.ui.theme, emitEvent });
       cleanupEditor = () => editor.cleanup();
 
       return editor;
