@@ -54,6 +54,7 @@
     "@biomejs/biome": "^2.4.15",
     "@changesets/cli": "^2.31.0",
     "@types/node": "^24.0.0",
+    "@types/bun": "latest",
     "bun-types": "latest",
     "typescript": "^5"
   },
