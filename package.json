@@ -1,6 +1,6 @@
 {
   "name": "@0xkahi/pi-vim-keys",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "Vim style input editor for Pi",
   "type": "module",
   "keywords": [
