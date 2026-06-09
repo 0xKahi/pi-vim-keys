@@ -9,9 +9,21 @@
     "vim-key-bindings"
   ],
   "author": "0xKahi",
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "src",
+    "docs/*.md",
+    "assets/config.schema.json",
+    "assets/example.gif",
+    "README.md",
+    "LICENSE"
+  ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/0xKahi/pi-vim-keys.git"
+    "url": "git+https://github.com/0xKahi/pi-vim-keys.git"
   },
   "pi": {
     "extensions": [
