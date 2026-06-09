@@ -115,7 +115,7 @@ export class VimModalEditor extends CustomEditor {
   }
 
   override handleInput(data: string): void {
-    if (DEBUG_INPUT) logInput(data);
+    if (DEBUG_INPUT) logInput(data, `cursor=${JSON.stringify(this.getCursor())}`);
 
     switch (this.mode) {
       case 'insert': {
@@ -152,7 +152,10 @@ export class VimModalEditor extends CustomEditor {
         this.textEdit.delete('backward', { saveToRegister: false });
       }
       // move back to mimic vim cursor
-      this.movement.move('left');
+      // unless we are at start of line
+      if (this.getCursor().col > 0) {
+        this.movement.move('left');
+      }
       this.setMode('normal');
       return;
     }
@@ -203,6 +206,12 @@ export class VimModalEditor extends CustomEditor {
     if (data === 'V' && this.setMode('visualLine')) return;
     if (this.handleMovementCommand(data)) return;
     if (this.handleNormalEditComands(data)) return;
+
+    // submits input
+    if (matchesKey(data, 'enter')) {
+      super.handleInput('\r');
+      return;
+    }
     // handle app actions key bindings
     const parsed = parseKey(data);
     if (parsed && this.handleActionCommands(parsed, false)) return;
