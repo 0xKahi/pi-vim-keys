@@ -47,3 +47,7 @@ const APP_KEYBINDINGS = {
 
 export const AppKeybindingSchema = z.enum(Object.keys(APP_KEYBINDINGS) as [AppKeybinding, ...AppKeybinding[]]);
 export type AppKeybindingId = z.infer<typeof AppKeybindingSchema>;
+
+export const ExtensionKeybindSchema = z.templateLiteral([z.literal('pi.vimKeys.event:'), z.string()]);
+export const CombinedKeybindSchema = z.union([ExtensionKeybindSchema, AppKeybindingSchema]);
+export type CombinedKeybindId = z.infer<typeof CombinedKeybindSchema>;

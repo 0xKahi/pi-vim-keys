@@ -159,4 +159,4 @@ export type ModifierKey = z.infer<typeof ModifierKeySchema>;
 
 export const KeybindWithModifierSchema = z.templateLiteral([ModifierKeySchema, z.literal('+'), BaseKeyBindSchema]);
 export const KeybindWithLeaderKeySchema = z.templateLiteral([z.literal('<leader>'), VimBaseKeySchema]);
-export const VimKeybindSchema = z.union([VimBaseKeySchema, KeybindWithLeaderKeySchema, KeybindWithModifierSchema]);
+export const VimKeybindSchema = z.union([KeybindWithLeaderKeySchema, KeybindWithModifierSchema]);

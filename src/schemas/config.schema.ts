@@ -1,7 +1,7 @@
 import z from 'zod';
 import { COLOR_HEX_REGEX } from '../constants';
 import { BaseKeyBindSchema, KeybindWithModifierSchema, VimKeybindSchema } from './key.schema';
-import { AppKeybindingSchema } from './keybind.schema';
+import { CombinedKeybindSchema } from './keybind.schema';
 
 const HtmlColorInputSchema = z.string().regex(COLOR_HEX_REGEX, { message: 'Invalid color format. Must be a 7-character hex code (e.g., #RRGGBB).' });
 
@@ -25,7 +25,7 @@ const NormalModeSequenceSchema = z.object({
 
 const NormalModeConfigSchema = z.union([NormalModeSingleKeySchema, NormalModeSequenceSchema]);
 
-const AppKeybindConfigSchema = z.partialRecord(AppKeybindingSchema, VimKeybindSchema);
+const KeybindConfigSchema = z.partialRecord(VimKeybindSchema, CombinedKeybindSchema);
 
 export const PiVimKeysConfigSchema = z.object({
   $schema: z.string().optional(),
@@ -39,7 +39,7 @@ export const PiVimKeysConfigSchema = z.object({
     type: 'single',
     key: 'escape',
   }),
-  keybinds: AppKeybindConfigSchema.default({}),
+  keybinds: KeybindConfigSchema.default({}),
 });
 export type PiVimKeysConfig = z.infer<typeof PiVimKeysConfigSchema>;
 
@@ -47,6 +47,6 @@ export const PartialPiVimKeysConfigSchema = z.object({
   $schema: z.string().optional(),
   colors: ModeColorConfigSchema.optional(),
   normalModeRemap: NormalModeConfigSchema.optional(),
-  keybinds: AppKeybindConfigSchema.optional(),
+  keybinds: KeybindConfigSchema.optional(),
 });
 export type PartialPiVimKeysConfig = z.infer<typeof PartialPiVimKeysConfigSchema>;

@@ -3,13 +3,13 @@ import type { KeySeqMatchRes, KeySequenceStrategy } from '..';
 
 export type TimeBasedSequenceOpts = {
   leader: VimKeyId;
-  sequences: VimKeyId[];
+  sequences: string[];
   timeout: number; // in milliseconds
 };
 
 export class TimeBasedKeySequence implements KeySequenceStrategy {
   readonly leader: VimKeyId;
-  readonly sequences: Map<string, VimKeyId>;
+  readonly sequences: Map<string, string>;
 
   private timeout: number;
   private timestamp = 0;

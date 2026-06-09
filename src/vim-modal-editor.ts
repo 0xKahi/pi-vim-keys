@@ -1,6 +1,7 @@
 import { CustomEditor, type KeybindingsManager, type Theme } from '@earendil-works/pi-coding-agent';
-import { type EditorTheme, matchesKey, type TUI, truncateToWidth, visibleWidth } from '@earendil-works/pi-tui';
+import { type EditorTheme, matchesKey, parseKey, type TUI, truncateToWidth, visibleWidth } from '@earendil-works/pi-tui';
 import type { ConfigLoader } from './config-loader';
+import { DEFAULT_LEADER_KEY } from './constants';
 import { EditorCompassController } from './editor/editor-compass-controller';
 import { HardwareCursorController } from './editor/hardware-cursor-controller';
 import { MovementController } from './editor/movement-controller';
@@ -11,13 +12,18 @@ import { MultiCharKeySequence } from './key-sequencer/strategies/multi-char-sequ
 import { SchemaBasedKeySequence } from './key-sequencer/strategies/schema-based-sequence';
 import { TimeBasedKeySequence } from './key-sequencer/strategies/time-based-sequence';
 import { CharOnlyKeySchema } from './schemas/key.schema';
+import { AppKeybindingSchema } from './schemas/keybind.schema';
 import type { VimMode } from './types';
 import { crayon } from './utils/crayon.util';
+import { logInput } from './utils/debug-input.util';
 import { formatModeLabel, isVisualMode } from './utils/vim-mode.util';
+
+const DEBUG_INPUT = false;
 
 type VimModalEditorOpts = {
   config: ConfigLoader;
   getTheme: () => Theme;
+  emitEvent: (channel: string, data: unknown) => void;
 };
 
 export class VimModalEditor extends CustomEditor {
@@ -30,6 +36,7 @@ export class VimModalEditor extends CustomEditor {
   };
   readonly config: ConfigLoader;
   private readonly getTheme: () => Theme;
+  private readonly emitEvent: (channel: string, data: unknown) => void;
   private readonly movement: MovementController;
   private readonly textEdit: TextEditController;
   private readonly compass: EditorCompassController;
@@ -43,6 +50,7 @@ export class VimModalEditor extends CustomEditor {
     this.kb = keybindings;
     this.config = opts.config;
     this.getTheme = opts.getTheme;
+    this.emitEvent = opts.emitEvent;
     this.movement = new MovementController(this);
     this.textEdit = new TextEditController(this);
     this.compass = new EditorCompassController(this);
@@ -107,6 +115,8 @@ export class VimModalEditor extends CustomEditor {
   }
 
   override handleInput(data: string): void {
+    if (DEBUG_INPUT) logInput(data);
+
     switch (this.mode) {
       case 'insert': {
         this.handleInsertMode(data);
@@ -160,6 +170,11 @@ export class VimModalEditor extends CustomEditor {
 
     if (result === 'completed' && matched) {
       this.tui.requestRender();
+
+      if (matched.leader === DEFAULT_LEADER_KEY && matched?.seqKey) {
+        this.handleActionCommands(matched.seqKey, true);
+        return;
+      }
       if (matched.leader === 'f') {
         this.movement.findChar('forward', data);
         return;
@@ -188,6 +203,9 @@ export class VimModalEditor extends CustomEditor {
     if (data === 'V' && this.setMode('visualLine')) return;
     if (this.handleMovementCommand(data)) return;
     if (this.handleNormalEditComands(data)) return;
+    // handle app actions key bindings
+    const parsed = parseKey(data);
+    if (parsed && this.handleActionCommands(parsed, false)) return;
   }
 
   private handleVisualMode(data: string): void {
@@ -386,6 +404,19 @@ export class VimModalEditor extends CustomEditor {
   private handlePendingY(data: string): boolean {
     if (data === 'y') return this.textEdit.yankLine();
     return false;
+  }
+
+  private handleActionCommands(data: string, leaderKey: boolean): boolean {
+    const bind = this.config.getActionKeybindingForKey({ key: data, leaderKey });
+    if (!bind) return false;
+    const { success, data: parsed } = AppKeybindingSchema.safeParse(bind);
+    if (success && data) {
+      const handler = this.actionHandlers.get(parsed);
+      handler?.();
+      return true;
+    }
+    this.emitEvent(bind, '');
+    return true;
   }
 
   private renderModeOnBorder(borderLine: string, width: number): string {
