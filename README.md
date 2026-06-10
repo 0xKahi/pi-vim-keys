@@ -2,7 +2,13 @@
 
 A Vim modal input editor for [Pi](https://github.com/earendil-works/pi). Replaces Pi's default input editor with full normal, insert, visual, and visual-line modes, plus configurable leader keybindings and per-mode cursor shapes.
 
+**Supports: Insert, Normal, Visual and Visual-line modes**
+
 ![Demo](assets/example.gif)
+
+**Custom LeaderKey Keybinds -> AppKeybinds**
+
+![KeybindDemo](assets/example-keybind.gif)
 
 ## Install
 
