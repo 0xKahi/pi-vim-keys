@@ -1,5 +1,11 @@
 # @0xkahi/pi-vim-keys
 
+## 1.0.2
+
+### Patch Changes
+
+- 5ac6ab9: allow normal mode keybindings to have multichar sequences `<leader>e`or `<leader>oe`
+
 ## 1.0.1
 
 ### Patch Changes
