@@ -4,7 +4,7 @@ import { type ZodSafeParseResult, z } from 'zod';
 import { DEFAULT_KEY_TIMEOUT, DEFAULT_LEADER_KEY } from './constants';
 import type { TimeBasedSequenceOpts } from './key-sequencer/strategies/time-based-sequence';
 import { type PartialPiVimKeysConfig, PartialPiVimKeysConfigSchema, type PiVimKeysConfig, PiVimKeysConfigSchema } from './schemas/config.schema';
-import { KeybindWithLeaderKeySchema, VimBaseKeySchema } from './schemas/key.schema';
+import { KeybindWithLeaderKeySchema, VimBaseKeySequenceSchema } from './schemas/key.schema';
 import type { CombinedKeybindId } from './schemas/keybind.schema';
 import type { VimKeyId, VimMode } from './types';
 import { PathUtil } from './utils/path.util';
@@ -116,7 +116,7 @@ export class ConfigLoader {
     for (const [vimKeybind, keybind] of Object.entries(this.config.keybinds)) {
       if (KeybindWithLeaderKeySchema.safeParse(vimKeybind).success) {
         const key = vimKeybind.slice('<leader>'.length);
-        const res = VimBaseKeySchema.safeParse(key);
+        const res = VimBaseKeySequenceSchema.safeParse(key);
         if (res.success) {
           this.leaderKeyToAppKeybindingMap.set(res.data, keybind);
         }

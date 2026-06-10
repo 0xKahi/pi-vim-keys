@@ -27,7 +27,7 @@ Nested `colors` and `keybinds` objects are merged key-by-key. If `normalModeRema
     "key": "escape"
   },
   "keybinds": {
-    "<leader>e": "app.editor.external",
+    "<leader>oe": "app.editor.external",
     "<leader>p": "app.clipboard.pasteImage",
     "<leader>l": "app.session.resume",
     "<leader>g": "app.session.tree",

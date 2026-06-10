@@ -157,6 +157,9 @@ export type VimBaseKey = z.infer<typeof VimBaseKeySchema>;
 export const ModifierKeySchema = z.enum(MODIFIER_KEYS);
 export type ModifierKey = z.infer<typeof ModifierKeySchema>;
 
+//** BaseKey multichar sequences e.g. `o` or `oe` */
+export const VimBaseKeySequenceSchema = z.union([VimBaseKeySchema, z.templateLiteral([VimBaseKeySchema, VimBaseKeySchema])]);
+export const KeybindWithLeaderKeySchema = z.templateLiteral([z.literal('<leader>'), VimBaseKeySequenceSchema]);
+
 export const KeybindWithModifierSchema = z.templateLiteral([ModifierKeySchema, z.literal('+'), BaseKeyBindSchema]);
-export const KeybindWithLeaderKeySchema = z.templateLiteral([z.literal('<leader>'), VimBaseKeySchema]);
 export const VimKeybindSchema = z.union([KeybindWithLeaderKeySchema, KeybindWithModifierSchema]);

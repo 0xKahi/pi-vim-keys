@@ -15,7 +15,7 @@ import { CharOnlyKeySchema } from './schemas/key.schema';
 import { AppKeybindingSchema } from './schemas/keybind.schema';
 import type { VimMode } from './types';
 import { crayon } from './utils/crayon.util';
-import { logInput } from './utils/debug-input.util';
+import { logKeyInput } from './utils/debug-input.util';
 import { formatModeLabel, isVisualMode } from './utils/vim-mode.util';
 
 const DEBUG_INPUT = false;
@@ -115,7 +115,7 @@ export class VimModalEditor extends CustomEditor {
   }
 
   override handleInput(data: string): void {
-    if (DEBUG_INPUT) logInput(data, `cursor=${JSON.stringify(this.getCursor())}`);
+    if (DEBUG_INPUT) logKeyInput(data, `cursor=${JSON.stringify(this.getCursor())}`);
 
     switch (this.mode) {
       case 'insert': {

@@ -80,7 +80,8 @@ Examples: `fa` jumps forward to the next `a`; `F,` jumps backward to the previou
 
 Normal mode also checks the configured `keybinds` from [`docs/configuration.md`](./configuration.md).
 
-- `<leader><key>` bindings are triggered with `space`, then the configured key.
+- supports leader-key key sequences
+- supports both multi key and single key sequences e.g. `<leader>oe`, `<leader>e`
 - Modifier bindings such as `ctrl+c` are triggered directly in normal mode.
 
 Configured keybindings can run Pi app keybindings or emit extension events.

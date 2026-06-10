@@ -9,14 +9,15 @@ export type TimeBasedSequenceOpts = {
 
 export class TimeBasedKeySequence implements KeySequenceStrategy {
   readonly leader: VimKeyId;
-  readonly sequences: Map<string, string>;
+  readonly sequences: Set<string>;
 
+  private savedSeq = '';
   private timeout: number;
   private timestamp = 0;
 
   constructor({ leader, sequences, timeout }: TimeBasedSequenceOpts) {
     this.leader = leader;
-    this.sequences = new Map(sequences.map(key => [key, key]));
+    this.sequences = new Set(sequences);
     this.timeout = timeout;
   }
 
@@ -29,18 +30,32 @@ export class TimeBasedKeySequence implements KeySequenceStrategy {
   }
 
   match(key: string): KeySeqMatchRes {
+    if (!this.hasSequence) return this.noSequenceMatch(key);
+
     if (this.pendingSequence) {
-      this.invalidate();
-      if (this.sequences.has(key)) {
-        return { result: 'completed', matched: { leader: this.leader, seqKey: this.sequences.get(key) } };
+      this.savedSeq += key;
+
+      if (this.sequences.has(this.savedSeq)) {
+        const seqKey = this.savedSeq;
+        this.invalidate();
+        return { result: 'completed', matched: { leader: this.leader, seqKey } };
       }
+
+      const hasPrefix = this.hasPrefixMatch(this.savedSeq);
+      if (hasPrefix) {
+        this.save();
+        return { result: 'pending', matched: { leader: this.leader, seqKey: this.savedSeq } };
+      }
+
+      this.invalidate();
       return { result: 'none' };
     }
 
     if (this.leader === key) {
-      const isPending = this.save();
+      this.invalidate(); // invalidate first to clear any timedout `saveSeq`
+      this.save();
       return {
-        result: isPending ? 'pending' : 'completed',
+        result: 'pending',
         matched: {
           leader: this.leader,
         },
@@ -49,16 +64,32 @@ export class TimeBasedKeySequence implements KeySequenceStrategy {
     return { result: 'none' };
   }
 
-  // update the timestamp if key matches main and has sequence, otherwise return the main key if it matches
-  private save(): boolean {
-    if (this.hasSequence) {
-      this.timestamp = Date.now();
-      return true;
+  // only here for toNormalModeSequence as we allow for single char no sequence
+  private noSequenceMatch(key: string): KeySeqMatchRes {
+    if (this.leader === key) {
+      return {
+        result: 'completed',
+        matched: {
+          leader: this.leader,
+        },
+      };
+    }
+    return { result: 'none' };
+  }
+
+  private hasPrefixMatch(prefix: string): boolean {
+    for (const seq of this.sequences) {
+      if (seq.startsWith(prefix)) return true;
     }
     return false;
   }
 
+  private save(): void {
+    this.timestamp = Date.now();
+  }
+
   private invalidate(): void {
     this.timestamp = 0;
+    this.savedSeq = '';
   }
 }

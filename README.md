@@ -24,6 +24,7 @@ pi install npm:@0xkahi/pi-vim-keys -l
 - **Mode-aware cursor and colors**: configurable mode label colors, plus block cursor in normal/visual modes and bar cursor in insert mode when terminal hardware cursor is enabled.
 - **Configurable insert-to-normal mapping**: use `escape` by default, or configure sequences like `jj` or `kj`.
 - **Normal-mode leader keybindings**: bind leader mappings to Pi app actions or extension commands.
+- **supports both single char and multichar sequence**: keybinds can be `<leader>e` or `<leader>oe`
 
 For custom extension keybind registration, see [Extension Keybindings](docs/configuration.md#extension-keybindings).
 
@@ -32,7 +33,7 @@ Example:
 ```json
 {
   "keybinds": {
-    "<leader>e": "app.editor.external",
+    "<leader>oe": "app.editor.external",
     "<leader>p": "app.clipboard.pasteImage",
     "<leader>l": "app.session.resume",
     "<leader>g": "app.session.tree",
