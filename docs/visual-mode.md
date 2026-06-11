@@ -76,3 +76,25 @@ Examples: `fa` extends the selection forward to the next `a`; `F,` extends it ba
 
 
 In visual line mode, edits operate on whole selected lines. In visual mode, edits operate on the selected character range.
+
+## Surround Selection
+
+`s` starts a surround sequence that wraps the selection with a bracket or quote pair, then returns to normal mode. The sequence is `s`, then `a` (around) or `i` (inside), then the pair character.
+
+- `a` (around) wraps the entire selection.
+- `i` (inside) wraps the selection minus its first and last characters.
+
+| Key | Description |
+| --- | --- |
+| `sa(` / `sab` | Wrap the selection with `( )` |
+| `sa{` | Wrap the selection with `{ }` |
+| `sa[` | Wrap the selection with `[ ]` |
+| `sa<` | Wrap the selection with `< >` |
+| `sa"` / `saq` | Wrap the selection with `" "` |
+| `sa'` | Wrap the selection with `' '` |
+| `` sa` `` | Wrap the selection with `` ` ` `` |
+| `si(`, `si{`, `si[`, ... | Same pairs, but wrap the interior of the selection |
+
+`b` is an alias for `(`/`)`, and `q` is an alias for `"`. The opening and closing pair characters select the same pair, so `sa(` and `sa)` behave identically.
+
+Example: with `jumps over` selected, `sa(` produces `(jumps over)`.
