@@ -1,5 +1,12 @@
 # @0xkahi/pi-vim-keys
 
+## 1.0.3
+
+### Patch Changes
+
+- d5cc855: added better pending key + sequence display
+- d5cc855: added surround functionality in viusal modes `sab` `saq` `sib` `saq`
+
 ## 1.0.2
 
 ### Patch Changes
