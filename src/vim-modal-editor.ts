@@ -13,7 +13,7 @@ import { SchemaBasedKeySequence } from './key-sequencer/strategies/schema-based-
 import { TimeBasedKeySequence } from './key-sequencer/strategies/time-based-sequence';
 import { CharOnlyKeySchema } from './schemas/key.schema';
 import { AppKeybindingSchema } from './schemas/keybind.schema';
-import type { VimMode } from './types';
+import { SurroundPairs, type VimMode } from './types';
 import { crayon } from './utils/crayon.util';
 import { logKeyInput } from './utils/debug-input.util';
 import { formatModeLabel, isVisualMode } from './utils/vim-mode.util';
@@ -240,6 +240,10 @@ export class VimModalEditor extends CustomEditor {
       if (matched.leader === 'g' && matched?.seqKey) {
         if (this.handlePendingG(matched.seqKey)) return;
       }
+
+      if (matched.leader === 's' && matched?.seqKey) {
+        if (this.handleVisualPendingS(matched.seqKey)) return;
+      }
     }
 
     if (this.handleEscapeVisualCommand(data)) return;
@@ -269,6 +273,10 @@ export class VimModalEditor extends CustomEditor {
 
       if (matched.leader === 'g' && matched?.seqKey) {
         if (this.handlePendingG(matched.seqKey)) return;
+      }
+
+      if (matched.leader === 's' && matched?.seqKey) {
+        if (this.handleVisualPendingS(matched.seqKey)) return;
       }
     }
 
@@ -415,6 +423,13 @@ export class VimModalEditor extends CustomEditor {
     return false;
   }
 
+  private handleVisualPendingS(data: string): boolean {
+    const pairs = SurroundPairs[data];
+    if (!pairs) return false;
+    this.textEdit.surround(this.compass.getAnchoredRange(), pairs);
+    return this.setMode('normal');
+  }
+
   private handleActionCommands(data: string, leaderKey: boolean): boolean {
     const bind = this.config.getActionKeybindingForKey({ key: data, leaderKey });
     if (!bind) return false;
@@ -468,11 +483,13 @@ export class VimModalEditor extends CustomEditor {
     this.keySeq.visual.register(new SchemaBasedKeySequence({ leader: 'f', schema: CharOnlyKeySchema }));
     this.keySeq.visual.register(new SchemaBasedKeySequence({ leader: 'F', schema: CharOnlyKeySchema }));
     this.keySeq.visual.register(new MultiCharKeySequence({ leader: 'g', sequences: ['g', 'e', 'E'] }));
+    this.keySeq.visual.register(new MultiCharKeySequence({ leader: 's', sequences: Object.keys(SurroundPairs) }));
   }
 
   private registerVisualLineModeSequences() {
     this.keySeq.visualLine.register(new SchemaBasedKeySequence({ leader: 'f', schema: CharOnlyKeySchema }));
     this.keySeq.visualLine.register(new SchemaBasedKeySequence({ leader: 'F', schema: CharOnlyKeySchema }));
     this.keySeq.visualLine.register(new MultiCharKeySequence({ leader: 'g', sequences: ['g', 'e', 'E'] }));
+    this.keySeq.visualLine.register(new MultiCharKeySequence({ leader: 's', sequences: Object.keys(SurroundPairs) }));
   }
 }

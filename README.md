@@ -31,6 +31,7 @@ pi install npm:@0xkahi/pi-vim-keys -l
 - **Configurable insert-to-normal mapping**: use `escape` by default, or configure sequences like `jj` or `kj`.
 - **Normal-mode leader keybindings**: bind leader mappings to Pi app actions or extension commands.
 - **supports both single char and multichar sequence**: keybinds can be `<leader>e` or `<leader>oe`
+- **Surround in visual modes**: wrap a selection with brackets or quotes via `s` (e.g. `sab`, `siq`).
 
 For custom extension keybind registration, see [Extension Keybindings](docs/configuration.md#extension-keybindings).
 
@@ -55,6 +56,6 @@ Example:
 |-----|----------------|
 | **[Configuration](docs/configuration.md)** | Config file locations, merge order, colors, insert-to-normal remaps, leader keybinds, extension keybinding registration, and schema usage |
 | **[Normal Mode](docs/normal-mode.md)** | Insert/visual mode entry, movement, word motions, find character, editing, and configured keybindings |
-| **[Visual Mode](docs/visual-mode.md)** | Character-range selections, mode switching, movement, word motions, find character, and selection editing |
-| **[Visual Line Mode](docs/visual-line-mode.md)** | Whole-line selections, mode switching, movement, word motions, find character, and line editing |
+| **[Visual Mode](docs/visual-mode.md)** | Character-range selections, mode switching, movement, word motions, find character, selection editing, and surround |
+| **[Visual Line Mode](docs/visual-line-mode.md)** | Whole-line selections, mode switching, movement, word motions, find character, line editing, and surround |
 

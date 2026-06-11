@@ -21,6 +21,12 @@ type RedoEntry = {
   after: EditorState;
 };
 
+export type SurroundOpts = {
+  type: 'around' | 'inside';
+  open: string;
+  close: string;
+};
+
 /**
  * Text editing helper for Pi's Editor/CustomEditor.
  *
@@ -101,6 +107,52 @@ export class TextEditController {
     state.lines.splice(state.cursorLine, 1);
     state.cursorLine = this.clamp(state.cursorLine, 0, state.lines.length - 1);
     this.setCursorCol(Math.min(oldCol, (state.lines[state.cursorLine] ?? '').length));
+    this.finishEdit();
+    return true;
+  }
+
+  surround(range: EditorAnchoredRange | undefined, { type, open, close }: SurroundOpts): boolean {
+    if (!range) return false;
+
+    const state = this.getState();
+    if (!state) return false;
+
+    this.normalizeState(state);
+
+    // Resolve the span to character coordinates. Line ranges wrap the full
+    // span (col 0 of the first line to the end of the last line).
+    let openAt: EditorCoordinate;
+    let closeAt: EditorCoordinate;
+
+    if (range.type === 'line') {
+      const startLine = this.clamp(Math.floor(range.start.line), 0, state.lines.length - 1);
+      const endLine = this.clamp(Math.floor(range.end.line), 0, state.lines.length - 1);
+      const from = Math.min(startLine, endLine);
+      const to = Math.max(startLine, endLine);
+      openAt = { line: from, col: 0 };
+      closeAt = { line: to, col: (state.lines[to] ?? '').length };
+    } else {
+      // `end` is exclusive, so it already points just past the selection.
+      const ordered = this.orderCoordinates(range.start, range.end);
+      openAt = { line: ordered.start.line, col: ordered.start.col };
+      closeAt = { line: ordered.end.line, col: ordered.end.col };
+    }
+
+    // `inside` keeps the first and last graphemes outside the wrapping pair.
+    if (type === 'inside') {
+      openAt = this.nextGraphemeCoordinate(openAt, state);
+      closeAt = this.previousGraphemeCoordinate(closeAt, state);
+    }
+
+    // Nothing left to wrap (e.g. `inside` on a one/two grapheme selection).
+    if (this.compareCoordinates(openAt, closeAt) > 0) return false;
+
+    this.startEdit();
+    // Insert the closing string first so the opening insertion offsets stay valid.
+    this.insertStringAt(closeAt, close, state);
+    this.insertStringAt(openAt, open, state);
+    state.cursorLine = openAt.line;
+    this.setCursorCol(openAt.col);
     this.finishEdit();
     return true;
   }
@@ -218,6 +270,35 @@ export class TextEditController {
     this.setCursorCol(0);
     this.finishEdit();
     return true;
+  }
+
+  private insertStringAt(coord: EditorCoordinate, text: string, state: EditorState): void {
+    const line = state.lines[coord.line] ?? '';
+    state.lines[coord.line] = line.slice(0, coord.col) + text + line.slice(coord.col);
+  }
+
+  private nextGraphemeCoordinate(coord: EditorCoordinate, state: EditorState): EditorCoordinate {
+    const line = state.lines[coord.line] ?? '';
+    const afterCursor = line.slice(coord.col);
+    const firstGrapheme = this.segment(afterCursor)[0];
+    return { line: coord.line, col: coord.col + (firstGrapheme?.segment.length ?? 0) };
+  }
+
+  private previousGraphemeCoordinate(coord: EditorCoordinate, state: EditorState): EditorCoordinate {
+    const line = state.lines[coord.line] ?? '';
+    const beforeCursor = line.slice(0, coord.col);
+    const graphemes = this.segment(beforeCursor);
+    const lastGrapheme = graphemes[graphemes.length - 1];
+    return { line: coord.line, col: lastGrapheme?.index ?? coord.col };
+  }
+
+  private orderCoordinates(a: EditorCoordinate, b: EditorCoordinate): { start: EditorCoordinate; end: EditorCoordinate } {
+    return this.compareCoordinates(a, b) <= 0 ? { start: a, end: b } : { start: b, end: a };
+  }
+
+  private compareCoordinates(a: EditorCoordinate, b: EditorCoordinate): number {
+    if (a.line !== b.line) return a.line - b.line;
+    return a.col - b.col;
   }
 
   private setRegister(entry: RegisterEntry): void {

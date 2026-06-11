@@ -59,6 +59,43 @@ describe('TextEditController.paste', () => {
   });
 });
 
+describe('TextEditController.surround', () => {
+  function selection(startCol: number, endCol: number): EditorAnchoredRange {
+    return {
+      type: 'cursor',
+      anchor: { line: 0, col: startCol },
+      cursor: { line: 0, col: endCol },
+      start: { line: 0, col: startCol },
+      end: { line: 0, col: endCol },
+      ranges: [{ line: 0, startCol, endCol }],
+    };
+  }
+
+  it('returns false when the range is undefined', () => {
+    const editor = makeEditor('a brown fox jumps over a lazy dog');
+
+    expect(new TextEditController(editor).surround(undefined, { type: 'around', open: '<', close: '>' })).toBe(false);
+  });
+
+  it('wraps the whole selection when type is around', () => {
+    const editor = makeEditor('a brown fox jumps over a lazy dog');
+    const range = selection(12, 22);
+
+    expect(new TextEditController(editor).surround(range, { type: 'around', open: '<', close: '>' })).toBe(true);
+    expect(editor.getText()).toBe('a brown fox <jumps over> a lazy dog');
+    expect(editor.getCursor()).toEqual({ line: 0, col: 12 });
+  });
+
+  it('wraps the interior when type is inside', () => {
+    const editor = makeEditor('a brown fox jumps over a lazy dog');
+    const range = selection(12, 22);
+
+    expect(new TextEditController(editor).surround(range, { type: 'inside', open: '<', close: '>' })).toBe(true);
+    expect(editor.getText()).toBe('a brown fox j<umps ove>r a lazy dog');
+    expect(editor.getCursor()).toEqual({ line: 0, col: 13 });
+  });
+});
+
 describe('TextEditController.deleteRange', () => {
   it('deletes visual-line ranges as whole logical lines', () => {
     const editor = makeEditor('one\ntwo\nthree\nfour');

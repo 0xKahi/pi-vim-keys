@@ -1,16 +1,19 @@
 import { parseKey } from '@earendil-works/pi-tui';
 import type { VimKeyId } from '../types';
 
+export type PendingKey = {
+  leader: VimKeyId;
+  seqKey?: string;
+};
+
 export type KeySeqMatchRes = {
   result: 'completed' | 'pending' | 'none';
-  matched?: { leader: VimKeyId; seqKey?: string };
+  matched?: PendingKey;
 };
 
 export interface KeySequenceStrategy {
   /** leader key to start sequence */
   readonly leader: VimKeyId;
-  /** keyId as string -> keyId map for easier data parsing */
-  // readonly sequences: Map<string, VimKeyId>;
 
   pendingSequence: boolean;
 
@@ -19,18 +22,22 @@ export interface KeySequenceStrategy {
 
 export class KeySequencer {
   private _registry: Map<string, KeySequenceStrategy> = new Map();
-  private lastPendingMatch: VimKeyId | null = null;
+  private lastPendingLeader: VimKeyId | null = null;
+  private lastPendingSeqKey: string | null = null;
 
   get registry(): Map<string, KeySequenceStrategy> {
     return this._registry;
   }
 
-  get pendingKey(): VimKeyId | null {
-    if (!this.lastPendingMatch) return null;
+  get pendingKey(): PendingKey | null {
+    if (!this.lastPendingLeader) return null;
 
-    const strategy = this.registry.get(this.lastPendingMatch);
+    const strategy = this.registry.get(this.lastPendingLeader);
     if (strategy?.pendingSequence === true) {
-      return strategy.leader;
+      return {
+        leader: strategy.leader,
+        seqKey: this.lastPendingSeqKey ?? undefined,
+      };
     }
 
     return null;
@@ -40,11 +47,12 @@ export class KeySequencer {
     const parsed = parseKey(data);
     if (!parsed) return { result: 'none' };
 
-    const strategy = this.registry.get(this.pendingKey ?? parsed);
+    const strategy = this.registry.get(this.pendingKey?.leader ?? parsed);
     if (strategy) {
       const data = strategy.match(parsed);
       if (data.result === 'pending') {
-        this.lastPendingMatch = strategy.leader;
+        this.lastPendingLeader = strategy.leader;
+        if (data?.matched?.seqKey) this.lastPendingSeqKey = data?.matched?.seqKey;
       } else {
         this.clearPendingMatch();
       }
@@ -62,6 +70,7 @@ export class KeySequencer {
   }
 
   private clearPendingMatch() {
-    this.lastPendingMatch = null;
+    this.lastPendingLeader = null;
+    this.lastPendingSeqKey = null;
   }
 }
