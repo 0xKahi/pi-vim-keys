@@ -141,7 +141,11 @@ export type CapitalLetterKey = z.infer<typeof CapitalLetterKeySchema>;
 export const SymbolKeySchema = z.enum(SYMBOL_KEYS);
 export type SymbolKey = z.infer<typeof SymbolKeySchema>;
 
-export const CharOnlyKeySchema = z.union([DigitKeySchema, LetterKeySchema, CapitalLetterKeySchema, SymbolKeySchema]);
+export const MissingSymbolKeySchema = z.enum(['"']);
+export type MissingSymbolKey = z.infer<typeof MissingSymbolKeySchema>;
+
+// adds Capital letter and " quotes thats not present
+export const CharOnlyKeySchema = z.union([DigitKeySchema, LetterKeySchema, CapitalLetterKeySchema, SymbolKeySchema, MissingSymbolKeySchema]);
 
 export const SpecialKeySchema = z.enum(SPECIAL_KEYS);
 export type SpecialKey = z.infer<typeof SpecialKeySchema>;

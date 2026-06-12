@@ -178,13 +178,13 @@ export class VimModalEditor extends CustomEditor {
         this.handleActionCommands(matched.seqKey, true);
         return;
       }
-      if (matched.leader === 'f') {
-        this.movement.findChar('forward', data);
+      if (matched.leader === 'f' && matched?.seqKey) {
+        this.movement.findChar('forward', matched?.seqKey);
         return;
       }
 
-      if (matched.leader === 'F') {
-        this.movement.findChar('backward', data);
+      if (matched.leader === 'F' && matched?.seqKey) {
+        this.movement.findChar('backward', matched?.seqKey);
         return;
       }
 
