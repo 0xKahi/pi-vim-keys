@@ -5,6 +5,7 @@ dist/
 # Dependencies
 node_modules/
 .pi/npm/
+.pi/private/
 
 # Logs
 logs/
