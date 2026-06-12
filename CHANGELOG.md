@@ -1,5 +1,11 @@
 # @0xkahi/pi-vim-keys
 
+## 1.0.5
+
+### Patch Changes
+
+- 8d991d5: fix missing symbol `"` in find char commands
+
 ## 1.0.4
 
 ### Patch Changes
