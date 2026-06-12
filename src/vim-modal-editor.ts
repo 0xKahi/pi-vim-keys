@@ -435,8 +435,10 @@ export class VimModalEditor extends CustomEditor {
     if (!bind) return false;
     const { success, data: parsed } = AppKeybindingSchema.safeParse(bind);
     if (success && data) {
-      const handler = this.actionHandlers.get(parsed);
-      handler?.();
+      if (parsed === 'app.interrupt') this.onEscape?.();
+      else if (parsed === 'app.exit') this.onCtrlD?.();
+      else if (parsed === 'app.clipboard.pasteImage') this.onPasteImage?.();
+      else this.actionHandlers.get(parsed)?.();
       return true;
     }
     this.emitEvent(bind, '');

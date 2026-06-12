@@ -12,7 +12,6 @@ const APP_KEYBINDINGS = {
   'app.model.select': true,
   'app.tools.expand': true,
   'app.thinking.toggle': true,
-  'app.session.toggleNamedFilter': true,
   'app.editor.external': true,
   'app.message.followUp': true,
   'app.message.dequeue': true,
@@ -21,31 +20,9 @@ const APP_KEYBINDINGS = {
   'app.session.tree': true,
   'app.session.fork': true,
   'app.session.resume': true,
-  'app.tree.foldOrUp': true,
-  'app.tree.unfoldOrDown': true,
-  'app.tree.editLabel': true,
-  'app.tree.toggleLabelTimestamp': true,
-  'app.session.togglePath': true,
-  'app.session.toggleSort': true,
-  'app.session.rename': true,
-  'app.session.delete': true,
-  'app.session.deleteNoninvasive': true,
-  'app.models.save': true,
-  'app.models.enableAll': true,
-  'app.models.clearAll': true,
-  'app.models.toggleProvider': true,
-  'app.models.reorderUp': true,
-  'app.models.reorderDown': true,
-  'app.tree.filter.default': true,
-  'app.tree.filter.noTools': true,
-  'app.tree.filter.userOnly': true,
-  'app.tree.filter.labeledOnly': true,
-  'app.tree.filter.all': true,
-  'app.tree.filter.cycleForward': true,
-  'app.tree.filter.cycleBackward': true,
-} as const satisfies Record<AppKeybinding, true>;
+} as const satisfies Partial<Record<AppKeybinding, boolean>>;
 
-export const AppKeybindingSchema = z.enum(Object.keys(APP_KEYBINDINGS) as [AppKeybinding, ...AppKeybinding[]]);
+export const AppKeybindingSchema = z.enum(Object.keys(APP_KEYBINDINGS) as [keyof typeof APP_KEYBINDINGS, ...(keyof typeof APP_KEYBINDINGS)[]]);
 export type AppKeybindingId = z.infer<typeof AppKeybindingSchema>;
 
 export const ExtensionKeybindSchema = z.templateLiteral([z.literal('pi.vimKeys.event:'), z.string()]);

@@ -8,6 +8,6 @@ export function logKeyInput(data: string, extra?: string) {
   );
 }
 
-export function logInput(data: unknown) {
+export function logData(data: unknown) {
   appendFileSync('pi-vim-log-input.log', `${new Date().toISOString()} data=${JSON.stringify(data)}\n`);
 }
