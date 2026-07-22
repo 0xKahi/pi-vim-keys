@@ -1,5 +1,11 @@
 # @0xkahi/pi-vim-keys
 
+## 1.0.6
+
+### Patch Changes
+
+- 872a045: fix undo statelines, update pi dependencied to 0.81.1
+
 ## 1.0.5
 
 ### Patch Changes
