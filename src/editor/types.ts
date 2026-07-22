@@ -7,10 +7,14 @@ export type EditorState = {
   cursorCol: number;
 };
 
-/** Pi's internal undo stack (only the surface our text editing touches). */
+/**
+ * Pi's internal undo stack (only the surface our text editing touches).
+ * Entries were historically raw EditorState; newer pi-tui versions store
+ * { state, pastes, pasteCounter } wrappers, so pop() returns unknown.
+ */
 export type UndoStackLike = {
   push: (state: EditorState) => void;
-  pop: () => EditorState | undefined;
+  pop: () => unknown;
   clear?: () => void;
   length?: number;
 };

@@ -546,9 +546,24 @@ export class TextEditController {
 
   private popUndoSnapshot(): EditorState | undefined {
     const undoStack = this.getInternal().undoStack;
-    if (undoStack) return undoStack.pop();
+    if (undoStack) return this.unwrapUndoEntry(undoStack.pop());
 
     return this.fallbackUndoStack.pop();
+  }
+
+  /**
+   * Pi's undo stack historically stored raw EditorState entries, but newer
+   * pi-tui versions wrap them as { state, pastes, pasteCounter }. Accept both.
+   */
+  private unwrapUndoEntry(entry: unknown): EditorState | undefined {
+    if (!entry || typeof entry !== 'object') return undefined;
+
+    if (Array.isArray((entry as EditorState).lines)) return entry as EditorState;
+
+    const wrapped = (entry as { state?: EditorState }).state;
+    if (wrapped && Array.isArray(wrapped.lines)) return wrapped;
+
+    return undefined;
   }
 
   private clearRedoStack(): void {

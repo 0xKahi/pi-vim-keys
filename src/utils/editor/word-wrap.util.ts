@@ -19,6 +19,10 @@ export type WrappedChunk = {
 
 const PASTE_MARKER_SINGLE = /^\[paste #(\d+)( (\+\d+ lines|\d+ chars))?\]$/;
 
+/** Local copy of pi-tui's `cjkBreakRegex` (not exported from its public API). */
+const CJK_BREAK_REGEX =
+  /[\p{Script_Extensions=Han}\p{Script_Extensions=Hiragana}\p{Script_Extensions=Katakana}\p{Script_Extensions=Hangul}\p{Script_Extensions=Bopomofo}]/u;
+
 export function wordWrapLine(line: string, maxWidth: number, preSegmented?: Intl.SegmentData[]): WrappedChunk[] {
   if (!line || maxWidth <= 0) {
     return [{ text: '', startIndex: 0, endIndex: 0 }];
@@ -81,10 +85,21 @@ export function wordWrapLine(line: string, maxWidth: number, preSegmented?: Intl
 
     currentWidth += graphemeWidth;
 
+    // Record wrap opportunity: whitespace followed by non-whitespace
+    // (multiple spaces join; the break point is after the last space),
+    // or at a boundary where either side is CJK (CJK allows breaking
+    // between any adjacent characters).
     const next = segments[i + 1];
     if (isWhitespace && next && (isPasteMarker(next.segment) || !isWhitespaceChar(next.segment))) {
       wrapOppIndex = next.index;
       wrapOppWidth = currentWidth;
+    } else if (!isWhitespace && next && !isWhitespaceChar(next.segment)) {
+      const isCjk = !isPasteMarker(grapheme) && CJK_BREAK_REGEX.test(grapheme);
+      const nextIsCjk = !isPasteMarker(next.segment) && CJK_BREAK_REGEX.test(next.segment);
+      if (isCjk || nextIsCjk) {
+        wrapOppIndex = next.index;
+        wrapOppWidth = currentWidth;
+      }
     }
   }
 
