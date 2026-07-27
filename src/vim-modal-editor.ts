@@ -20,6 +20,15 @@ import { formatModeLabel, isVisualMode } from './utils/vim-mode.util';
 
 const DEBUG_INPUT = false;
 
+/** omp's EditorTheme may carry editorPaddingX; pi's does not declare it. */
+function readOmpPaddingXHint(theme: EditorTheme): number {
+  const candidate: unknown = theme;
+  if (typeof candidate === 'object' && candidate !== null && 'editorPaddingX' in candidate && typeof candidate.editorPaddingX === 'number') {
+    return candidate.editorPaddingX;
+  }
+  return 2;
+}
+
 type VimModalEditorOpts = {
   config: ConfigLoader;
   getTheme: () => Theme;
@@ -54,7 +63,7 @@ export class VimModalEditor extends CustomEditor {
     this.movement = new MovementController(this);
     this.textEdit = new TextEditController(this);
     this.compass = new EditorCompassController(this);
-    this.visualHighlight = new VisualHighlightRenderer(this);
+    this.visualHighlight = new VisualHighlightRenderer(this, readOmpPaddingXHint(theme));
     this.hardwareCursor = new HardwareCursorController(tui);
     this.hardwareCursor.apply(this.mode);
     this.registerInsertModeSequences();
