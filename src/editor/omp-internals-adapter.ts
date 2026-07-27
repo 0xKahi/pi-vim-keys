@@ -199,7 +199,7 @@ export class OmpEditorInternalsAdapter implements EditorInternals {
       get(_target, prop) {
         const lines = editor.getLines();
         if (prop === 'length') return lines.length;
-        if (typeof prop === 'string' && prop in MUTATING_ARRAY_METHODS) {
+        if (typeof prop === 'string' && Object.hasOwn(MUTATING_ARRAY_METHODS, prop)) {
           return (...args: unknown[]) => {
             const next = [...editor.getLines()];
             // Guarded by the MUTATING_ARRAY_METHODS membership check above;
