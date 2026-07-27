@@ -1,4 +1,4 @@
-import { CURSOR_MARKER, type Editor, visibleWidth } from '@earendil-works/pi-tui';
+import { CURSOR_MARKER, type Editor, sliceByColumn, visibleWidth } from '@earendil-works/pi-tui';
 import { crayon } from '../utils/crayon.util';
 import { wordWrapLine } from '../utils/editor/word-wrap.util';
 import type { EditorAnchoredRange, EditorRange } from './editor-compass-controller';
@@ -33,6 +33,8 @@ type RenderEditorTextLineOptions = {
   layoutLine: LayoutLine;
   range: EditorAnchoredRange;
   style: HighlightStyle;
+  /** The rendered row being replaced; omp rows keep their side chrome from it. */
+  originalLine: string;
 };
 
 type RenderHighlightedTextOptions = {
@@ -65,8 +67,22 @@ export class VisualHighlightRenderer {
    */
   private readonly editorInternals: EditorInternals;
 
-  constructor(private readonly editor: Editor) {
+  /**
+   * pi renders text rows as bare `padding + text + padding` and exposes
+   * `getPaddingX()`; omp renders rows with box side chrome (`│ + pad + text
+   * + pad + │`, bottom border fused into the last text row) and keeps
+   * padding private. Probed once — drives both padding resolution and the
+   * row reconstruction format.
+   */
+  private readonly hostHasPiRowFormat: boolean;
+
+  constructor(
+    private readonly editor: Editor,
+    /** omp resolves padding as `override ?? theme.editorPaddingX ?? 2`; the plugin never sets the override. */
+    private readonly ompPaddingXHint: number = 2,
+  ) {
     this.editorInternals = getEditorInternals(editor);
+    this.hostHasPiRowFormat = typeof (editor as unknown as { getPaddingX?: unknown }).getPaddingX === 'function';
   }
 
   render({ lines, width, range, style }: RenderVisualHighlightOptions): void {
@@ -82,22 +98,34 @@ export class VisualHighlightRenderer {
       const renderedLineIndex = index + 1; // index 0 is the editor's top border
       if (renderedLineIndex >= lines.length) break;
 
+      const originalLine = lines[renderedLineIndex];
+      if (originalLine === undefined) break;
       lines[renderedLineIndex] = this.renderEditorTextLine({
         layout,
         layoutLine,
         range,
         style,
+        originalLine,
       });
     }
   }
 
   private getEditorLayout(width: number): EditorLayout {
     const maxPadding = Math.max(0, Math.floor((width - 1) / 2));
-    const paddingX = Math.min(this.editor.getPaddingX(), maxPadding);
-    const contentWidth = Math.max(1, width - paddingX * 2);
+    const paddingX = Math.min(this.getHostPaddingX(), maxPadding);
+    // omp rows carry a border glyph on each side in addition to the padding.
+    const contentWidth = this.hostHasPiRowFormat ? Math.max(1, width - paddingX * 2) : Math.max(1, width - (paddingX + 1) * 2);
     const layoutWidth = this.getLayoutWidth(contentWidth, paddingX);
 
     return { contentWidth, layoutWidth, paddingX };
+  }
+
+  private getHostPaddingX(): number {
+    if (this.hostHasPiRowFormat) {
+      // Probed in the constructor: pi exposes getPaddingX().
+      return (this.editor as unknown as { getPaddingX: () => number }).getPaddingX();
+    }
+    return this.ompPaddingXHint;
   }
 
   /**
@@ -206,7 +234,7 @@ export class VisualHighlightRenderer {
     return layoutLines;
   }
 
-  private renderEditorTextLine({ layout, layoutLine, range, style }: RenderEditorTextLineOptions): string {
+  private renderEditorTextLine({ layout, layoutLine, range, style, originalLine }: RenderEditorTextLineOptions): string {
     const leftPadding = ' '.repeat(layout.paddingX);
     const rightPadding = leftPadding;
     const emitCursorMarker = this.isFocused() && !this.editor.isShowingAutocomplete();
@@ -240,7 +268,43 @@ export class VisualHighlightRenderer {
     const padding = ' '.repeat(Math.max(0, layout.contentWidth - lineVisibleWidth));
     const lineRightPadding = cursorInPadding ? rightPadding.slice(1) : rightPadding;
 
+    if (!this.hostHasPiRowFormat) {
+      return this.renderOmpRow({ originalLine, displayText, lineVisibleWidth, layout });
+    }
+
     return `${leftPadding}${displayText}${padding}${lineRightPadding}`;
+  }
+
+  /**
+   * Rebuilds an omp text row, preserving the host's side chrome (glyphs +
+   * styling, any symbol preset) by column-slicing it off the original
+   * rendered row. Chrome is `1 + paddingX` cells per side — the fused
+   * bottom-border row (`╰─…text…─╯`) uses the same widths, so one formula
+   * covers every text row. An end-of-line cursor can overflow the content
+   * area by one cell; omp absorbs that by shrinking the right chrome, and so
+   * does this.
+   */
+  private renderOmpRow({
+    originalLine,
+    displayText,
+    lineVisibleWidth,
+    layout,
+  }: {
+    originalLine: string;
+    displayText: string;
+    lineVisibleWidth: number;
+    layout: EditorLayout;
+  }): string {
+    const chromeWidth = layout.paddingX + 1;
+    const totalWidth = visibleWidth(originalLine);
+    const contentTarget = Math.max(0, totalWidth - chromeWidth * 2);
+    const overflow = Math.max(0, lineVisibleWidth - contentTarget);
+
+    const left = sliceByColumn(originalLine, 0, chromeWidth);
+    const right = sliceByColumn(originalLine, totalWidth - chromeWidth + overflow, chromeWidth - overflow);
+    const padding = ' '.repeat(Math.max(0, contentTarget - lineVisibleWidth));
+
+    return `${left}${displayText}${padding}${right}`;
   }
 
   private renderHighlightedText({ layoutLine, range, style, cursorPos, marker, useHardwareCursor }: RenderHighlightedTextOptions): string {

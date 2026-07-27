@@ -1,4 +1,5 @@
 import type { Editor } from '@earendil-works/pi-tui';
+import { getOrCreateAdapter, hasNativeInternals } from './omp-internals-adapter';
 
 /** Pi's internal text buffer + cursor position. */
 export type EditorState = {
@@ -70,7 +71,13 @@ export type EditorInternals = {
 /**
  * The one contained, unsafe view into Pi's Editor internals. Import this from
  * editor components instead of casting `editor as unknown as ...` inline.
+ *
+ * On hosts whose Editor keeps these members runtime-accessible (pi), this is
+ * the direct cast it always was. On hosts with ECMAScript-private fields
+ * (oh-my-pi), the cast would yield `undefined` for every member, so a cached
+ * public-API adapter is returned instead — see omp-internals-adapter.ts.
  */
 export function getEditorInternals(editor: Editor): EditorInternals {
-  return editor as unknown as EditorInternals;
+  if (hasNativeInternals(editor)) return editor as unknown as EditorInternals;
+  return getOrCreateAdapter(editor);
 }

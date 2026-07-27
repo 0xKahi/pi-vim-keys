@@ -131,3 +131,108 @@ describe('VisualHighlightRenderer overlay', () => {
     }
   }
 });
+
+/**
+ * omp host format: no getPaddingX, rows carry box side chrome, and the bottom
+ * border is fused into the last text row. The renderer must preserve that
+ * chrome (any glyph/styling) while swapping only the content region.
+ */
+function ompRow(leftChrome: string, content: string, rightChrome: string, width = 20): string {
+  const pad = width - visibleWidth(leftChrome) - visibleWidth(content) - visibleWidth(rightChrome);
+  return leftChrome + content + ' '.repeat(Math.max(0, pad)) + rightChrome;
+}
+
+class OmpEditorDouble {
+  focused = true;
+  private readonly lines: string[];
+
+  constructor(
+    text: string,
+    private readonly cursor: { line: number; col: number },
+  ) {
+    this.lines = text.split('\n');
+  }
+
+  getCursor(): { line: number; col: number } {
+    return this.cursor;
+  }
+
+  getLines(): string[] {
+    return [...this.lines];
+  }
+
+  getText(): string {
+    return this.lines.join('\n');
+  }
+
+  isShowingAutocomplete(): boolean {
+    return false;
+  }
+}
+
+function makeRange(line: number, startCol: number, endCol: number): EditorAnchoredRange {
+  return {
+    type: 'cursor',
+    anchor: { line, col: startCol },
+    cursor: { line, col: endCol },
+    start: { line, col: startCol },
+    end: { line, col: endCol },
+    ranges: [{ line, startCol, endCol }],
+  } as EditorAnchoredRange;
+}
+
+describe('VisualHighlightRenderer on omp row format', () => {
+  it('does not throw and preserves the fused bottom-border chrome', () => {
+    const editor = new OmpEditorDouble('hello world', { line: 0, col: 11 }) as unknown as Editor;
+    const lines = ['╭──────────────────╮', ompRow('╰─ ', 'hello world', ' ─╯')];
+
+    new VisualHighlightRenderer(editor).render({
+      lines,
+      width: 20,
+      range: makeRange(0, 0, 5),
+      style: text => `[${text}]`,
+    });
+
+    const row = lines[1] ?? '';
+    expect(row.startsWith('╰─ ')).toBe(true);
+    expect(row.endsWith(' ─╯')).toBe(true);
+    expect(row).toContain('[hello]');
+  });
+
+  it('preserves side chrome on middle rows and highlights the selection', () => {
+    const editor = new OmpEditorDouble('one\ntwo', { line: 0, col: 0 }) as unknown as Editor;
+    const lines = ['╭──────────────────╮', ompRow('│  ', 'one', '  │'), ompRow('╰─ ', 'two', ' ─╯')];
+
+    new VisualHighlightRenderer(editor).render({
+      lines,
+      width: 20,
+      range: makeRange(1, 0, 2),
+      style: text => `[${text}]`,
+    });
+
+    const middle = lines[1] ?? '';
+    expect(middle.startsWith('│  ')).toBe(true);
+    expect(middle.endsWith('  │')).toBe(true);
+
+    const fused = lines[2] ?? '';
+    expect(fused.startsWith('╰─ ')).toBe(true);
+    expect(fused.endsWith(' ─╯')).toBe(true);
+    expect(fused).toContain('[tw]o');
+  });
+
+  it('preserves total row width under a width-neutral style', () => {
+    const editor = new OmpEditorDouble('one\ntwo', { line: 0, col: 0 }) as unknown as Editor;
+    const lines = ['╭──────────────────╮', ompRow('│  ', 'one', '  │'), ompRow('╰─ ', 'two', ' ─╯')];
+
+    new VisualHighlightRenderer(editor).render({
+      lines,
+      width: 20,
+      range: makeRange(1, 0, 2),
+      style: text => `\x1b[7m${text}\x1b[0m`, // ANSI-only: adds no visible cells
+    });
+
+    for (const line of lines) {
+      expect(visibleWidth(crayon.stripAnsi(line))).toBe(20);
+    }
+  });
+});
