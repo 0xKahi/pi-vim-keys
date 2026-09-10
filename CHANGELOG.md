@@ -1,5 +1,11 @@
 # @0xkahi/pi-vim-keys
 
+## 1.0.7
+
+### Patch Changes
+
+- 032b9fe: increase pi deps -> v0.85.1
+
 ## 1.0.6
 
 ### Patch Changes
