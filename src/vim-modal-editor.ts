@@ -6,6 +6,7 @@ import { EditorCompassController } from './editor/editor-compass-controller';
 import { HardwareCursorController } from './editor/hardware-cursor-controller';
 import { MovementController } from './editor/movement-controller';
 import { TextEditController } from './editor/text-edit-controller';
+import type { EditorHostServices } from './editor/types';
 import { VisualHighlightRenderer } from './editor/visual-highlight-renderer';
 import { KeySequencer } from './key-sequencer';
 import { MultiCharKeySequence } from './key-sequencer/strategies/multi-char-sequence';
@@ -42,6 +43,8 @@ export class VimModalEditor extends CustomEditor {
   private readonly compass: EditorCompassController;
   private readonly visualHighlight: VisualHighlightRenderer;
   private readonly hardwareCursor: HardwareCursorController;
+  // Reset before each super.render, captured by Pi's top-border hook, then passed to the selection overlay.
+  private topHiddenLineCount = 0;
 
   kb: KeybindingsManager;
 
@@ -51,10 +54,16 @@ export class VimModalEditor extends CustomEditor {
     this.config = opts.config;
     this.getTheme = opts.getTheme;
     this.emitEvent = opts.emitEvent;
-    this.movement = new MovementController(this);
-    this.textEdit = new TextEditController(this);
+    const host: EditorHostServices = {
+      isFocused: () => this.focused,
+      notifyChange: text => this.onChange?.(text),
+      requestRender: () => this.tui.requestRender(),
+      isHardwareCursorEnabled: () => tui.getShowHardwareCursor(),
+    };
+    this.movement = new MovementController(this, host);
+    this.textEdit = new TextEditController(this, host);
     this.compass = new EditorCompassController(this);
-    this.visualHighlight = new VisualHighlightRenderer(this);
+    this.visualHighlight = new VisualHighlightRenderer(this, host);
     this.hardwareCursor = new HardwareCursorController(tui);
     this.hardwareCursor.apply(this.mode);
     this.registerInsertModeSequences();
@@ -91,6 +100,7 @@ export class VimModalEditor extends CustomEditor {
   }
 
   override render(width: number): string[] {
+    this.topHiddenLineCount = 0;
     const lines = super.render(width);
     this.hardwareCursor.stripFakeCursor(lines);
 
@@ -100,18 +110,22 @@ export class VimModalEditor extends CustomEditor {
         width,
         range: this.compass.getAnchoredRange(),
         style: text => this.getTheme().bg('selectedBg', text),
+        scrollOffset: this.topHiddenLineCount,
       });
     }
 
-    const borderLineIndex = this.findBottomBorderLineIndex(lines);
-
-    if (borderLineIndex === -1) return lines;
-
-    const borderLine = lines[borderLineIndex];
-    if (borderLine === undefined) return lines;
-
-    lines[borderLineIndex] = this.renderModeOnBorder(borderLine, width);
     return lines;
+  }
+
+  // Pi computes scrolling while rendering this border; capture its hidden rows for the overlay.
+  protected override renderTopBorder(width: number, hiddenLineCount: number): string {
+    this.topHiddenLineCount = hiddenLineCount;
+    return super.renderTopBorder(width, hiddenLineCount);
+  }
+
+  // Keep Pi's border rendering intact, then add the modal mode/pending-key label.
+  protected override renderBottomBorder(width: number, hiddenLineCount: number): string {
+    return this.renderModeOnBorder(super.renderBottomBorder(width, hiddenLineCount), width);
   }
 
   override handleInput(data: string): void {
@@ -455,17 +469,6 @@ export class VimModalEditor extends CustomEditor {
     }
 
     return `${truncateToWidth(borderLine, borderWidth, '', true)}${label}`;
-  }
-
-  private findBottomBorderLineIndex(lines: string[]): number {
-    for (let i = lines.length - 1; i >= 0; i--) {
-      const plainLine = crayon.stripAnsi(lines[i] ?? '');
-      if (plainLine.startsWith('─')) {
-        return i;
-      }
-    }
-
-    return -1;
   }
 
   private registerInsertModeSequences() {

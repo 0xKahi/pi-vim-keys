@@ -2,7 +2,7 @@ import { CURSOR_MARKER, type Editor, visibleWidth } from '@earendil-works/pi-tui
 import { crayon } from '../utils/crayon.util';
 import { wordWrapLine } from '../utils/editor/word-wrap.util';
 import type { EditorAnchoredRange, EditorRange } from './editor-compass-controller';
-import { type EditorInternals, getEditorInternals } from './types';
+import { type EditorHostServices, type EditorInternals, getEditorInternals } from './types';
 
 type HighlightStyle = (text: string) => string;
 
@@ -11,6 +11,8 @@ type RenderVisualHighlightOptions = {
   width: number;
   range: EditorAnchoredRange | undefined;
   style: HighlightStyle;
+  // Captured by VimModalEditor from Pi's renderTopBorder hook for this render.
+  scrollOffset: number;
 };
 
 type LayoutLine = {
@@ -65,18 +67,22 @@ export class VisualHighlightRenderer {
    */
   private readonly editorInternals: EditorInternals;
 
-  constructor(private readonly editor: Editor) {
+  constructor(
+    private readonly editor: Editor,
+    private readonly host: EditorHostServices,
+  ) {
     this.editorInternals = getEditorInternals(editor);
   }
 
-  render({ lines, width, range, style }: RenderVisualHighlightOptions): void {
+  render({ lines, width, range, style, scrollOffset }: RenderVisualHighlightOptions): void {
     if (!range) return;
 
     const layout = this.getEditorLayout(width);
     const layoutLines = this.buildLayoutLines(layout.layoutWidth);
-    const scrollOffset = this.getScrollOffset(layoutLines.length);
+    const maxScrollOffset = Math.max(0, layoutLines.length - 1);
+    const boundedScrollOffset = Math.max(0, Math.min(Math.floor(scrollOffset), maxScrollOffset));
     const visibleRowCount = this.getVisibleTextRowCount(lines);
-    const visibleLayoutLines = layoutLines.slice(scrollOffset, scrollOffset + visibleRowCount);
+    const visibleLayoutLines = layoutLines.slice(boundedScrollOffset, boundedScrollOffset + visibleRowCount);
 
     for (const [index, layoutLine] of visibleLayoutLines.entries()) {
       const renderedLineIndex = index + 1; // index 0 is the editor's top border
@@ -101,6 +107,9 @@ export class VisualHighlightRenderer {
   }
 
   /**
+   * Reuse the explicit per-render scroll offset supplied by the modal adapter; Pi's
+   * private scroll position is intentionally not read here.
+   *
    * Pi's Editor records the wrap width it last rendered with (`lastWidth`).
    * Because `super.render()` runs before this overlay, that value is current,
    * so we reuse it instead of re-deriving Pi's "reserve one column for the
@@ -311,19 +320,12 @@ export class VisualHighlightRenderer {
     return intervals.sort((a, b) => a.start - b.start);
   }
 
-  private getScrollOffset(layoutLineCount: number): number {
-    const maxScrollOffset = Math.max(0, layoutLineCount - 1);
-    const scrollOffset = typeof this.editorInternals.scrollOffset === 'number' ? this.editorInternals.scrollOffset : 0;
-
-    return Math.max(0, Math.min(Math.floor(scrollOffset), maxScrollOffset));
-  }
-
   private isFocused(): boolean {
-    return this.editorInternals.focused === true;
+    return this.host.isFocused();
   }
 
   private usesHardwareCursor(): boolean {
-    return this.editorInternals.tui?.getShowHardwareCursor?.() === true;
+    return this.host.isHardwareCursorEnabled();
   }
 
   private segment(text: string, mode: 'grapheme' | 'word'): Iterable<Intl.SegmentData> {

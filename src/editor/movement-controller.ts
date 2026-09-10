@@ -1,5 +1,5 @@
 import type { Editor } from '@earendil-works/pi-tui';
-import { getEditorInternals } from './types';
+import { type EditorHostServices, getEditorInternals } from './types';
 
 export type BasicDirection = 'left' | 'right' | 'up' | 'down';
 export type JumpPos = 'start' | 'end';
@@ -31,7 +31,12 @@ type WordRange = {
  * public cursor setter later.
  */
 export class MovementController {
-  constructor(private readonly editor: Editor) {}
+  // Render requests come from the injected host service; cursor writes stay on the contained adapter,
+  // rather than being simulated by sending input back through handleInput.
+  constructor(
+    private readonly editor: Editor,
+    private readonly host: EditorHostServices,
+  ) {}
 
   move(direction: BasicDirection): boolean {
     const before = this.getCursor();
@@ -206,7 +211,7 @@ export class MovementController {
   }
 
   private requestRender(): void {
-    getEditorInternals(this.editor).tui?.requestRender?.();
+    this.host.requestRender();
   }
 
   private compare(a: Position, b: Position): number {

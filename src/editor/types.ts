@@ -13,26 +13,34 @@ export type EditorState = {
  * { state, pastes, pasteCounter } wrappers, so pop() returns unknown.
  */
 export type UndoStackLike = {
-  push: (state: EditorState) => void;
+  push: (state: EditorState | { state: EditorState; pastes?: Map<number, string>; pasteCounter?: number }) => void;
   pop: () => unknown;
   clear?: () => void;
   length?: number;
 };
 
-type EditorTuiInternals = {
-  requestRender?: () => void;
-  getShowHardwareCursor?: () => boolean;
+/**
+ * Narrow, capability-oriented view of the host editor that controllers need.
+ * VimModalEditor owns these capabilities publicly (or via pi-tui's protected
+ * `tui`), so controllers receive them explicitly instead of casting the editor.
+ */
+export type EditorHostServices = {
+  /** Public `Editor.focused`. */
+  isFocused: () => boolean;
+  /** Public `Editor.onChange`, invoked with the editor's current text. */
+  notifyChange: (text: string) => void;
+  /** Protected `Editor.tui.requestRender()`. */
+  requestRender: () => void;
+  /** `TUI.getShowHardwareCursor()`. */
+  isHardwareCursorEnabled: () => boolean;
 };
 
 /**
  * The single slice of Pi's Editor internals our editor layer depends on.
  *
- * Pi does not expose the text buffer, cursor writes, undo primitives, or render
- * layout state on its public API, so every editor component reaches in through
- * this one shape instead of redeclaring its own cast. Keeping it centralized
- * means a pi-tui change that renames or removes any of these fields breaks a
- * single type and a single test (test/editor-internals.test.ts) — a loud,
- * one-location failure rather than N scattered casts silently drifting apart.
+ * Public members and injected host services provide focus, change notification,
+ * render requests, and hardware-cursor state. This adapter retains only the
+ * private state and helpers that Pi does not expose.
  *
  * All fields are optional: this is an unsafe view, and treating every access as
  * "might be missing" keeps the controllers defensive if Pi ever drops one.
@@ -42,8 +50,6 @@ export type EditorInternals = {
   state?: EditorState;
 
   // render / layout state (visual highlight)
-  focused?: boolean;
-  scrollOffset?: number;
   /** Wrap width Pi's editor last rendered with; reused so wrapping can't drift. */
   lastWidth?: number;
 
@@ -52,15 +58,17 @@ export type EditorInternals = {
   snappedFromCursorCol?: number | null;
   lastAction?: unknown;
 
+  // paste metadata (undo/redo correctness)
+  // Pi's undo entries carry paste identity and expansion data, so restoring text
+  // without the Map and counter makes [paste #N] markers resolve incorrectly.
+  pastes?: Map<number, string>;
+  pasteCounter?: number;
+
   // history / undo (text edit)
   historyIndex?: number;
   undoStack?: UndoStackLike;
   pushUndoSnapshot?: () => void;
   cancelAutocomplete?: () => void;
-
-  // callbacks + host
-  onChange?: (text: string) => void;
-  tui?: EditorTuiInternals;
 
   // helpers
   moveCursor?: (deltaLine: number, deltaCol: number) => void;
