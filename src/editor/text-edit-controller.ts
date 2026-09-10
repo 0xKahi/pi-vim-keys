@@ -1,6 +1,6 @@
 import type { Editor } from '@earendil-works/pi-tui';
 import type { EditorAnchoredRange, EditorCoordinate } from './editor-compass-controller';
-import { type EditorInternals, type EditorState, getEditorInternals } from './types';
+import { type EditorHostServices, type EditorInternals, type EditorState, getEditorInternals } from './types';
 
 export type NewLineDirection = 'up' | 'down';
 export type DeleteDirection = 'forward' | 'backward';
@@ -16,9 +16,16 @@ type RegisterEntry = {
   lines: string[];
 };
 
+type EditorSnapshot = {
+  state: EditorState;
+  /** Absent when the runtime did not provide paste metadata (fallback path). */
+  pastes?: Map<number, string>;
+  pasteCounter?: number;
+};
+
 type RedoEntry = {
-  before: EditorState;
-  after: EditorState;
+  before: EditorSnapshot;
+  after: EditorSnapshot;
 };
 
 export type SurroundOpts = {
@@ -35,11 +42,14 @@ export type SurroundOpts = {
  * small utility so modal-editor commands can stay declarative.
  */
 export class TextEditController {
-  private readonly fallbackUndoStack: EditorState[] = [];
+  private readonly fallbackUndoStack: EditorSnapshot[] = [];
   private redoStack: RedoEntry[] = [];
   private register?: RegisterEntry;
 
-  constructor(private readonly editor: Editor) {}
+  constructor(
+    private readonly editor: Editor,
+    private readonly host: EditorHostServices,
+  ) {}
 
   delete(direction: DeleteDirection, opts: DeleteOptions = { saveToRegister: true }): boolean {
     return direction === 'forward' ? this.deleteForward(opts) : this.deleteBackward(opts);
@@ -202,8 +212,10 @@ export class TextEditController {
     const snapshot = this.popUndoSnapshot();
     if (!snapshot) return false;
 
-    const current = this.cloneState(state);
-    this.redoStack.push({ before: this.cloneState(snapshot), after: current });
+    const current = this.captureSnapshot();
+    if (!current) return false;
+
+    this.redoStack.push({ before: this.cloneSnapshot(snapshot), after: current });
     this.applySnapshot(snapshot);
     return true;
   }
@@ -215,7 +227,7 @@ export class TextEditController {
     const entry = this.redoStack.pop();
     if (!entry) return false;
 
-    if (!this.linesEqual(state, entry.before)) return false;
+    if (!this.linesEqual(state, entry.before.state) || !this.metadataEqual(this.captureSnapshot(), entry.before)) return false;
 
     this.pushUndoSnapshot();
     this.applySnapshot(entry.after);
@@ -513,15 +525,20 @@ export class TextEditController {
     this.notifyChange();
   }
 
-  private applySnapshot(snapshot: EditorState): void {
+  private applySnapshot(snapshot: EditorSnapshot): void {
     const state = this.getState();
     if (!state) return;
 
-    const next = this.cloneState(snapshot);
+    const next = this.cloneState(snapshot.state);
     state.lines = next.lines;
     state.cursorLine = next.cursorLine;
     state.cursorCol = next.cursorCol;
     this.normalizeState(state);
+
+    const internal = this.getInternal();
+    if (snapshot.pastes !== undefined) internal.pastes = new Map(snapshot.pastes);
+    if (snapshot.pasteCounter !== undefined) internal.pasteCounter = snapshot.pasteCounter;
+
     this.resetCursorState();
     this.notifyChange();
   }
@@ -536,32 +553,42 @@ export class TextEditController {
       return;
     }
 
+    const snapshot = this.captureSnapshot();
+    if (!snapshot) return;
+
     if (internal.undoStack) {
-      internal.undoStack.push(state);
+      internal.undoStack.push(snapshot);
       return;
     }
 
-    this.fallbackUndoStack.push(this.cloneState(state));
+    this.fallbackUndoStack.push(snapshot);
   }
 
-  private popUndoSnapshot(): EditorState | undefined {
+  private popUndoSnapshot(): EditorSnapshot | undefined {
     const undoStack = this.getInternal().undoStack;
     if (undoStack) return this.unwrapUndoEntry(undoStack.pop());
 
-    return this.fallbackUndoStack.pop();
+    const snapshot = this.fallbackUndoStack.pop();
+    return snapshot ? this.cloneSnapshot(snapshot) : undefined;
   }
 
   /**
    * Pi's undo stack historically stored raw EditorState entries, but newer
    * pi-tui versions wrap them as { state, pastes, pasteCounter }. Accept both.
    */
-  private unwrapUndoEntry(entry: unknown): EditorState | undefined {
+  private unwrapUndoEntry(entry: unknown): EditorSnapshot | undefined {
     if (!entry || typeof entry !== 'object') return undefined;
 
-    if (Array.isArray((entry as EditorState).lines)) return entry as EditorState;
+    const raw = entry as { lines?: unknown; state?: EditorState; pastes?: Map<number, string>; pasteCounter?: number };
+    if (Array.isArray(raw.lines)) return { state: this.cloneState(entry as EditorState) };
 
-    const wrapped = (entry as { state?: EditorState }).state;
-    if (wrapped && Array.isArray(wrapped.lines)) return wrapped;
+    if (raw.state && Array.isArray(raw.state.lines)) {
+      return {
+        state: this.cloneState(raw.state),
+        pastes: raw.pastes instanceof Map ? new Map(raw.pastes) : undefined,
+        pasteCounter: typeof raw.pasteCounter === 'number' ? raw.pasteCounter : undefined,
+      };
+    }
 
     return undefined;
   }
@@ -571,9 +598,8 @@ export class TextEditController {
   }
 
   private notifyChange(): void {
-    const internal = this.getInternal();
-    internal.onChange?.(this.editor.getText());
-    internal.tui?.requestRender?.();
+    this.host.notifyChange(this.editor.getText());
+    this.host.requestRender();
   }
 
   private resetCursorState(): void {
@@ -627,12 +653,46 @@ export class TextEditController {
     return getEditorInternals(this.editor);
   }
 
+  private captureSnapshot(): EditorSnapshot | undefined {
+    const internal = this.getInternal();
+    const state = internal.state;
+    if (!state) return undefined;
+
+    return {
+      state: this.cloneState(state),
+      pastes: internal.pastes instanceof Map ? new Map(internal.pastes) : undefined,
+      pasteCounter: typeof internal.pasteCounter === 'number' ? internal.pasteCounter : undefined,
+    };
+  }
+
+  private cloneSnapshot(snapshot: EditorSnapshot): EditorSnapshot {
+    return {
+      state: this.cloneState(snapshot.state),
+      pastes: snapshot.pastes === undefined ? undefined : new Map(snapshot.pastes),
+      pasteCounter: snapshot.pasteCounter,
+    };
+  }
+
   private cloneState(state: EditorState): EditorState {
     return {
       lines: [...state.lines],
       cursorLine: state.cursorLine,
       cursorCol: state.cursorCol,
     };
+  }
+
+  private metadataEqual(current: EditorSnapshot | undefined, before: EditorSnapshot): boolean {
+    if (!current) return false;
+
+    if (current.pasteCounter !== undefined && before.pasteCounter !== undefined && current.pasteCounter !== before.pasteCounter) return false;
+    if (current.pastes !== undefined && before.pastes !== undefined) {
+      if (current.pastes.size !== before.pastes.size) return false;
+      for (const [key, value] of current.pastes) {
+        if (before.pastes.get(key) !== value) return false;
+      }
+    }
+
+    return true;
   }
 
   private linesEqual(a: EditorState, b: EditorState): boolean {

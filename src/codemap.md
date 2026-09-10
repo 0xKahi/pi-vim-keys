@@ -7,7 +7,7 @@ The `src/` directory is the root of the `pi-vim-keys` extension. It wires the Pi
 ## Design
 
 - **Extension entry point**: `index.ts` exports a default function that receives the `ExtensionAPI`, registers `session_start` and `session_shutdown` handlers, and installs a session-scoped editor factory via `ctx.ui.setEditorComponent`.
-- **Modal editor**: `VimModalEditor` in `vim-modal-editor.ts` extends `CustomEditor` from `@earendil-works/pi-coding-agent` and composes the actual editing logic through controllers:
+- **Modal editor**: `VimModalEditor` in `vim-modal-editor.ts` extends `CustomEditor` from `@earendil-works/pi-coding-agent`. It injects `EditorHostServices`—public `focused`/`onChange`, protected `tui` render requests, and hardware-cursor visibility—into the movement, text-edit, and visual-highlight controllers, and composes the actual editing logic through controllers:
   - `MovementController` for cursor movement, word jumps, leaps, and find-char.
   - `TextEditController` for insert/delete/undo/redo/yank/paste/new-line operations and surround.
   - `EditorCompassController` for anchor/range bookkeeping in visual modes.
@@ -33,7 +33,7 @@ The `src/` directory is the root of the `pi-vim-keys` extension. It wires the Pi
    - `handleNormalMode` resolves leader sequences (`<leader>`, `f`/`F`, `g`, `d`, `y`), movement keys (`h`/`j`/`k`/`l`, `w`/`b`/`e`, `0`/`$`/`G`, etc.), edit commands (`x`, `u`, `p`, etc.), insert-entry keys (`i`/`a`/`o`/...), `Enter`, and finally app action keybindings via `handleActionCommands`.
    - `handleVisualMode` and `handleVisualLineMode` resolve visual sequences, manage anchor state through `EditorCompassController`, and execute range-based edits through `TextEditController`.
 6. `setMode` transitions mode, updates anchors and cursor shape via `HardwareCursorController`, and triggers a re-render.
-7. `render` calls the parent render, strips the fake cursor, overlays the visual selection highlight when applicable, and paints the current mode label on the bottom border line.
+7. `render` resets and captures Pi's top-border hidden-line count around the parent render, strips the fake cursor, and passes that explicit scroll offset to the visual selection overlay. The protected `renderBottomBorder` override calls `super` and paints the current mode/pending-key label while preserving Pi's border styling and indicators.
 8. On `session_shutdown`, `index.ts` calls the stored `cleanupEditor` closure, which delegates to `VimModalEditor.cleanup` to restore the hardware cursor.
 
 ## Integration
@@ -42,3 +42,5 @@ The `src/` directory is the root of the `pi-vim-keys` extension. It wires the Pi
 - `index.ts` emits arbitrary extension events via `pi.events.emit` and passes the same emitter into `VimModalEditor` so action keybindings can broadcast app-level commands.
 - `ConfigLoader` integrates with the host filesystem via `PathUtil.findExtensionConfig` and `readFileSync`, with the host UI through `ctx.ui.notify`, and with the editor through its getter APIs.
 - `VimModalEditor` relies on child modules for everything except high-level dispatch and rendering orchestration; it is the integration point between host editor callbacks and the child controllers/sequencers/renderers.
+- Controllers receive `EditorHostServices` for focus, change notification, render requests, and hardware-cursor visibility. The contained `EditorInternals` adapter retains only state/edit bookkeeping, cursor movement, segmentation, undo primitives, wrap width, and paste metadata needed for behavior; public host services replace the removed host/TUI fields.
+- `test/vim-modal-editor-render.test.ts` verifies border hooks, labels, scrolling, autocomplete, selection, and cursor rendering; `test/paste-undo-redo.test.ts` verifies complete paste-aware snapshots, including raw-state/fallback entries that restore buffer and cursor without inventing paste metadata.

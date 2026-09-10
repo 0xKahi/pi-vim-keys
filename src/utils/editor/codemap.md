@@ -4,14 +4,14 @@
 
 This folder contains low-level editor utilities used by the vim modal layer to mirror Pi TUI's internal rendering behavior without violating Pi's extension-loader constraints.
 
-- `word-wrap.util.ts` — Runtime-safe, standalone copy of Pi's `wordWrapLine`. It splits a single logical line of text into visual-line `WrappedChunk`s that match the wrap geometry used by Pi's own editor renderer.
-- `pi-tui-internals.ts` — Test-only deep import of Pi TUI's real `wordWrapLine` and its `TextChunk` type. It exists purely as a parity oracle so the local copy can be verified against the upstream implementation.
+- `word-wrap.util.ts` — Runtime-safe, standalone parity copy of Pi's `wordWrapLine`. It splits a single logical line into visual-line `WrappedChunk`s matching Pi's geometry; the renderer combines it with Pi's recorded `lastWidth`.
+- `pi-tui-internals.ts` — TEST-ONLY parity bridge to Pi TUI's real `wordWrapLine` and `TextChunk` type. It is never part of runtime loading and introduces no runtime deep import.
 
 These utilities enable `VisualHighlightRenderer` to compute the same visual-row layout Pi produced during `super.render()`, which is required to overlay visual-mode selection highlighting on wrapped text.
 
 ## Design
 
-The folder intentionally separates runtime usage from test-time verification because Pi's extension loader resolves bare `@earendil-works/pi-tui` to the package main file and then appends subpaths. A deep import of `@earendil-works/pi-tui/dist/components/editor.js` therefore resolves to a bogus path at runtime, but resolves correctly under Bun/Node during tests.
+The folder intentionally separates runtime usage from test-time verification because Pi's extension loader resolves bare `@earendil-works/pi-tui` to the package main file and then appends subpaths. The runtime uses only `word-wrap.util.ts`; `pi-tui-internals.ts` is a TEST-ONLY parity bridge because a deep import of `@earendil-works/pi-tui/dist/components/editor.js` is unsafe at runtime but resolves during tests.
 
 ### `wordWrapLine` algorithm
 
@@ -54,7 +54,7 @@ Special cases:
 
 At test time:
 
-1. `test/word-wrap.util.test.ts` imports `piWordWrapLine` through `src/utils/editor/pi-tui-internals.ts`.
+1. `test/word-wrap.util.test.ts` imports `piWordWrapLine` through the TEST-ONLY `src/utils/editor/pi-tui-internals.ts` bridge.
 2. For every test line and width, it asserts structural equality between `localWordWrapLine(line, width)` and `piWordWrapLine(line, width)`.
 3. A second test exercises the `preSegmented` path to ensure the optimization matches Pi's behavior.
 

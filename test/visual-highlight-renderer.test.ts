@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { Editor, type EditorTheme, TUI, visibleWidth } from '@earendil-works/pi-tui';
+import { Editor, type EditorTheme, TuiMainScreen, visibleWidth } from '@earendil-works/pi-tui';
 import type { EditorAnchoredRange } from '../src/editor/editor-compass-controller';
 import { VisualHighlightRenderer } from '../src/editor/visual-highlight-renderer';
 import { crayon } from '../src/utils/crayon.util';
@@ -23,7 +23,7 @@ const EDITOR_THEME: EditorTheme = {
 
 function makeEditor(text: string, paddingX: number, rows = 30): Editor {
   const terminal = { rows, columns: 200, write() {}, on() {}, off() {}, hideCursor() {}, showCursor() {} };
-  const tui = new TUI(terminal as unknown as ConstructorParameters<typeof TUI>[0], false);
+  const tui = new TuiMainScreen(terminal as unknown as ConstructorParameters<typeof TuiMainScreen>[0], false);
   const editor = new Editor(tui, EDITOR_THEME, { paddingX });
   editor.setText(text);
   return editor;
@@ -44,6 +44,15 @@ function editorLastWidth(editor: Editor): number {
   return (editor as unknown as { lastWidth: number }).lastWidth;
 }
 
+function renderer(editor: Editor): VisualHighlightRenderer {
+  return new VisualHighlightRenderer(editor, {
+    isFocused: () => editor.focused,
+    notifyChange: () => {},
+    requestRender: () => {},
+    isHardwareCursorEnabled: () => false,
+  });
+}
+
 const WIDTHS = [10, 20, 40, 80, 120];
 const PADDINGS = [0, 1, 2];
 
@@ -54,7 +63,7 @@ describe('VisualHighlightRenderer layout drift', () => {
         const editor = makeEditor(WRAPPING_TEXT, paddingX);
         editor.render(width); // sets editor.lastWidth, exactly as super.render() does in production
 
-        const layout = internals(new VisualHighlightRenderer(editor)).getEditorLayout(width);
+        const layout = internals(renderer(editor)).getEditorLayout(width);
 
         expect(layout.layoutWidth).toBe(editorLastWidth(editor));
         expect(layout.paddingX * 2 + layout.contentWidth).toBe(width);
@@ -68,7 +77,7 @@ describe('VisualHighlightRenderer layout drift', () => {
         // [top border, ...text rows, bottom border]; text rows = length - 2.
         const expectedTextRows = rendered.length - 2;
 
-        expect(internals(new VisualHighlightRenderer(editor)).getVisibleTextRowCount(rendered)).toBe(expectedTextRows);
+        expect(internals(renderer(editor)).getVisibleTextRowCount(rendered)).toBe(expectedTextRows);
       });
 
       it(`every rendered row is exactly width wide (width=${width}, paddingX=${paddingX})`, () => {
@@ -92,10 +101,11 @@ describe('VisualHighlightRenderer overlay', () => {
       ranges: [{ line: 0, startCol: 0, endCol: 5 }],
     } as unknown as EditorAnchoredRange;
 
-    new VisualHighlightRenderer(editor).render({
+    renderer(editor).render({
       lines,
       width: 40,
       range,
+      scrollOffset: 0,
       style: (text: string) => `⟦${text}⟧`,
     });
 
@@ -117,10 +127,11 @@ describe('VisualHighlightRenderer overlay', () => {
           ranges: [{ line: 0, startCol: 0, endCol: firstLineLength }],
         } as unknown as EditorAnchoredRange;
 
-        new VisualHighlightRenderer(editor).render({
+        renderer(editor).render({
           lines,
           width,
           range,
+          scrollOffset: 0,
           style: (text: string) => text, // identity style keeps widths exact
         });
 

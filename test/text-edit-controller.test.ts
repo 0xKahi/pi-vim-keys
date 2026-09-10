@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { Editor, type EditorTheme, TUI } from '@earendil-works/pi-tui';
+import { Editor, type EditorTheme, TuiMainScreen } from '@earendil-works/pi-tui';
 import type { EditorAnchoredRange } from '../src/editor/editor-compass-controller';
 import { TextEditController } from '../src/editor/text-edit-controller';
 import { getEditorInternals } from '../src/editor/types';
@@ -11,10 +11,19 @@ const EDITOR_THEME: EditorTheme = {
 
 function makeEditor(text: string): Editor {
   const terminal = { rows: 30, columns: 200, write() {}, on() {}, off() {}, hideCursor() {}, showCursor() {} };
-  const tui = new TUI(terminal as unknown as ConstructorParameters<typeof TUI>[0], false);
+  const tui = new TuiMainScreen(terminal as unknown as ConstructorParameters<typeof TuiMainScreen>[0], false);
   const editor = new Editor(tui, EDITOR_THEME);
   editor.setText(text);
   return editor;
+}
+
+function host(editor: Editor) {
+  return {
+    isFocused: () => editor.focused,
+    notifyChange: () => {},
+    requestRender: () => {},
+    isHardwareCursorEnabled: () => false,
+  };
 }
 
 function setCursor(editor: Editor, line: number, col: number): void {
@@ -28,13 +37,13 @@ describe('TextEditController.paste', () => {
   it('returns false when the register is empty', () => {
     const editor = makeEditor('abc');
 
-    expect(new TextEditController(editor).paste('forward')).toBe(false);
+    expect(new TextEditController(editor, host(editor)).paste('forward')).toBe(false);
     expect(editor.getText()).toBe('abc');
   });
 
   it('pastes characterwise from the internal register', () => {
     const editor = makeEditor('abc');
-    const textEdit = new TextEditController(editor);
+    const textEdit = new TextEditController(editor, host(editor));
     setCursor(editor, 0, 1);
 
     expect(textEdit.delete('forward', { saveToRegister: true })).toBe(true);
@@ -47,7 +56,7 @@ describe('TextEditController.paste', () => {
 
   it('pastes linewise from the internal register', () => {
     const editor = makeEditor('one\ntwo\nthree');
-    const textEdit = new TextEditController(editor);
+    const textEdit = new TextEditController(editor, host(editor));
     setCursor(editor, 1, 0);
 
     expect(textEdit.deleteLine()).toBe(true);
@@ -74,14 +83,14 @@ describe('TextEditController.surround', () => {
   it('returns false when the range is undefined', () => {
     const editor = makeEditor('a brown fox jumps over a lazy dog');
 
-    expect(new TextEditController(editor).surround(undefined, { type: 'around', open: '<', close: '>' })).toBe(false);
+    expect(new TextEditController(editor, host(editor)).surround(undefined, { type: 'around', open: '<', close: '>' })).toBe(false);
   });
 
   it('wraps the whole selection when type is around', () => {
     const editor = makeEditor('a brown fox jumps over a lazy dog');
     const range = selection(12, 22);
 
-    expect(new TextEditController(editor).surround(range, { type: 'around', open: '<', close: '>' })).toBe(true);
+    expect(new TextEditController(editor, host(editor)).surround(range, { type: 'around', open: '<', close: '>' })).toBe(true);
     expect(editor.getText()).toBe('a brown fox <jumps over> a lazy dog');
     expect(editor.getCursor()).toEqual({ line: 0, col: 12 });
   });
@@ -90,7 +99,7 @@ describe('TextEditController.surround', () => {
     const editor = makeEditor('a brown fox jumps over a lazy dog');
     const range = selection(12, 22);
 
-    expect(new TextEditController(editor).surround(range, { type: 'inside', open: '<', close: '>' })).toBe(true);
+    expect(new TextEditController(editor, host(editor)).surround(range, { type: 'inside', open: '<', close: '>' })).toBe(true);
     expect(editor.getText()).toBe('a brown fox j<umps ove>r a lazy dog');
     expect(editor.getCursor()).toEqual({ line: 0, col: 13 });
   });
@@ -111,7 +120,7 @@ describe('TextEditController.deleteRange', () => {
       ],
     };
 
-    expect(new TextEditController(editor).deleteRange(range)).toBe(true);
+    expect(new TextEditController(editor, host(editor)).deleteRange(range)).toBe(true);
     expect(editor.getText()).toBe('one\nfour');
     expect(editor.getCursor()).toEqual({ line: 1, col: 0 });
   });
@@ -130,7 +139,7 @@ describe('TextEditController.deleteRange', () => {
       ],
     };
 
-    expect(new TextEditController(editor).deleteRange(range)).toBe(true);
+    expect(new TextEditController(editor, host(editor)).deleteRange(range)).toBe(true);
     expect(editor.getText()).toBe('');
     expect(editor.getCursor()).toEqual({ line: 0, col: 0 });
   });
@@ -150,7 +159,7 @@ describe('TextEditController.deleteRange', () => {
       ],
     };
 
-    expect(new TextEditController(editor).deleteRange(range)).toBe(true);
+    expect(new TextEditController(editor, host(editor)).deleteRange(range)).toBe(true);
     expect(editor.getText()).toBe('alrlie');
     expect(editor.getCursor()).toEqual({ line: 0, col: 2 });
   });

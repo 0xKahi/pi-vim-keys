@@ -39,7 +39,7 @@ The repository's core responsibility is to bridge Pi's extension lifecycle and T
 4. The extension installs a custom editor factory. Each host editor instantiation creates `VimModalEditor` with the active TUI, theme, keybindings manager, resolved config, theme getter, and event emitter.
 5. `VimModalEditor.handleInput` routes raw input to the current mode handler. Each handler first asks its mode-specific `KeySequencer` to resolve pending/completed chord state, then dispatches movement, editing, visual selection, app-command, or fallback insert behavior.
 6. Editor operations are delegated to controllers in `src/editor/`: movement updates cursor internals, text edits transact buffer/undo/register state, visual compass produces anchored ranges, and visual highlighting overlays selection styling onto Pi's rendered rows.
-7. `render(width)` lets Pi render the base editor first, then strips fake cursor styling when hardware cursor mode is active, overlays visual selections, and draws the mode/pending-key label on the bottom border.
+7. Pi renders the base editor first. The extension then strips fake-cursor styling when hardware cursor mode is active, overlays visual selection using the hidden-line count captured by the `renderTopBorder` hook, and composes the mode/pending-key label inside the `renderBottomBorder` override (calling `super` so Pi's border color and scroll indicators survive).
 8. On `session_shutdown`, the stored cleanup closure calls `VimModalEditor.cleanup()` to restore terminal cursor state.
 
 ## Build and Configuration Flow

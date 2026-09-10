@@ -8,12 +8,12 @@ The `src/editor/` folder implements the low-level editing primitives for the `pi
 
 The folder is split into one helper type file and five controllers, each with a narrow, non-overlapping responsibility:
 
-- `types.ts` — Centralizes the unsafe view into Pi's editor internals through `EditorInternals` and `getEditorInternals(editor)`. It exposes `EditorState` (`lines`, `cursorLine`, `cursorCol`), undo-stack surface, render/layout state, and optional helper hooks such as `moveCursor`/`segment`/`pushUndoSnapshot`. Keeping the cast in one file means a pi-tui internal change breaks one type and one test instead of scattered casts across the codebase.
+- `types.ts` — Centralizes the single unsafe view into Pi's editor internals through `EditorInternals` and `getEditorInternals(editor)`. The retained surface is exactly buffer/cursor `state`, edit bookkeeping (`preferredVisualCol`, `snappedFromCursorCol`, `lastAction`, `historyIndex`), undo primitives (`undoStack`, `pushUndoSnapshot`, `cancelAutocomplete`), cursor movement (`moveCursor`), segmentation (`segment`), Pi's recorded `lastWidth`, and optional paste metadata (`pastes`, `pasteCounter`). Each field remains only for behavior unavailable through the public API; host focus, change callbacks, render requests, and hardware-cursor visibility arrive through `EditorHostServices` instead.
 - `editor-compass-controller.ts` — Selection-intent calculator. It stores an `AnchorState` (`'cursor'` or `'line'`) and resolves it into an `EditorAnchoredRange` made of normalized `EditorRange[]` entries. The `end` coordinate is exclusive for character spans, and the controller advances it by one grapheme so that visual selections include the last character under the cursor.
 - `movement-controller.ts` — Vim-style cursor navigation. Uses Pi's `internal.moveCursor` when available; otherwise falls back to mutating `EditorState` directly. Supports basic arrow moves, word jumps (`start`/`end`, forward/backward), line/page leaps, and single-character `f`/`F`-style searches.
 - `text-edit-controller.ts` — Text mutation and register/undo state. Performs deletes, yanks, pastes, new-line insertion, surround wrapping, and undo/redo. Each edit follows the same transaction pattern: `startEdit()` (push undo snapshot, cancel autocomplete, clear redo stack), mutate buffer/cursor, `finishEdit()` (reset cursor bookkeeping, fire `onChange`, request render).
 - `hardware-cursor-controller.ts` — Adapts the terminal hardware cursor shape to the current `VimMode`. In normal/visual/visual-line modes it emits a steady block (`\x1b[2 q`); in insert mode it emits a steady bar (`\x1b[6 q`). It also strips the fake cursor highlight injected by Pi when hardware cursor mode is active.
-- `visual-highlight-renderer.ts` — Post-processing overlay that applies selection styling to Pi's already-rendered editor lines. It reconstructs wrapped layout rows with `wordWrapLine`, respects `scrollOffset`, and highlights the portions that overlap the current `EditorAnchoredRange`.
+- `visual-highlight-renderer.ts` — Post-processing overlay that applies selection styling to Pi's already-rendered editor lines. It reconstructs wrapped layout rows with `wordWrapLine`, uses the explicit per-render `scrollOffset` captured by the modal border hook, and reuses Pi's recorded `lastWidth` for wrapping parity.
 
 Utilities used by the editor layer:
 
@@ -33,7 +33,7 @@ Utilities used by the editor layer:
    - For `leap`, it jumps to column 0 or line length for line bounds, or to line 0 / last line for page bounds.
    - For `findChar`, it scans the buffer forward or backward starting just past the cursor and stops at the first matching grapheme.
 4. `setCursor(position)` clamps `cursorLine`/`cursorCol` to valid buffer bounds, writes them into `internal.state`, and clears Pi's cursor bookkeeping (`lastAction`, `preferredVisualCol`, `snappedFromCursorCol`).
-5. If the cursor changed, `finishIfMoved` calls `requestRender` via `internal.tui.requestRender()`.
+5. If the cursor changed, `finishIfMoved` calls `requestRender` via the injected `EditorHostServices`.
 
 ### Text-edit flow
 
@@ -46,7 +46,7 @@ Utilities used by the editor layer:
    - Pushes an undo snapshot, preferring `internal.pushUndoSnapshot()`, then `internal.undoStack`, then a local `fallbackUndoStack`.
 4. The command mutates `state.lines` and `state.cursorLine`/`state.cursorCol` (via `setCursorCol`) and, for deletes/yanks, stores text in the register (`RegisterEntry` of type `'character'` or `'line'`).
 5. `finishEdit()` resets cursor bookkeeping and calls `notifyChange`, which fires the editor's `onChange(text)` callback and requests a render.
-6. `undo()` pops the most recent snapshot, pushes a redo entry (`before` = snapshot, `after` = current state), and applies the snapshot. `redo()` verifies the current state matches the redo entry's `before`, pushes a new undo snapshot, and applies the `after` state.
+6. `undo()` pops the most recent complete snapshot, pushes a redo entry (`before` = snapshot, `after` = current state), and applies it. Snapshots include cloned state plus optional paste map/counter metadata. `redo()` verifies buffer and cursor state, and compares paste metadata when both sides carry it, before applying `after`. Native Pi snapshots are preferred; wrapped undo entries, raw `EditorState` entries, and a local fallback stack are supported. Raw-state entries restore buffer and cursor only, with no invented paste metadata.
 
 ### Compass wrapping flow
 
@@ -58,10 +58,10 @@ Utilities used by the editor layer:
 
 ### Visual-highlight flow
 
-1. When the mode is visual/visual-line, the modal layer calls `VisualHighlightRenderer.render({ lines, width, range, style })` after Pi's editor has rendered.
+1. When the mode is visual/visual-line, the modal layer calls `VisualHighlightRenderer.render({ lines, width, range, style, scrollOffset })` after Pi's editor has rendered; `scrollOffset` is the count captured by `renderTopBorder`.
 2. The renderer derives `EditorLayout` from the provided `width` and Pi's `paddingX`. The wrap width is reused from `internal.lastWidth` when available; otherwise it falls back to `contentWidth - (paddingX ? 0 : 1)`.
 3. `buildLayoutLines` produces `LayoutLine[]` rows by applying `wordWrapLine` to each logical line. Each row records its logical line, buffer column range, wrapped text, and whether the cursor sits inside it.
-4. `getScrollOffset` clamps `internal.scrollOffset` to the layout range, and `getVisibleTextRowCount` counts the rows between the top border (row 0) and the bottom border (a line starting with `─`) so the overlay matches Pi's real viewport.
+4. The renderer clamps the explicit `scrollOffset` captured from Pi's `renderTopBorder` hook to the layout range. `getVisibleTextRowCount` counts rows between the top border (row 0) and bottom border (a line starting with `─`) so the overlay matches Pi's real viewport without reading Pi's private scroll offset.
 5. For each visible row, `renderEditorTextLine` reassembles left padding, highlighted text, right padding, and the cursor cell. If the cursor is at the end of a row, it appends a marker cell using either the hardware cursor marker (`CURSOR_MARKER`) or a fake inverse-video cell (`\x1b[7m`).
 6. `renderHighlightedText` splits each row at the cursor and calls `renderHighlightedSlice` on each part. `renderHighlightedSlice` computes local intervals that overlap the `range.ranges` and applies the supplied `style` function (typically `crayon.reverseVideo`) to selected segments.
 7. The output array replaces Pi's text rows in place, leaving the top/bottom border lines untouched.
@@ -77,16 +77,18 @@ Utilities used by the editor layer:
 
 The editor controllers are owned and orchestrated by the modal layer (outside `src/editor/`). The modal layer:
 
-- Instantiates `MovementController`, `TextEditController`, `EditorCompassController`, and `HardwareCursorController` with the active Pi `Editor`/`TUI` instance.
+- Builds `EditorHostServices` from public `focused`/`onChange` plus protected TUI render and hardware-cursor services, then injects it into `MovementController`, `TextEditController`, and `VisualHighlightRenderer`; `EditorCompassController` and `HardwareCursorController` retain their focused adapters.
 - Tracks `VimMode` and dispatches key events to controller methods (e.g., `movementController.move('right')`, `textEditController.delete('forward')`).
 - Toggles anchors via `editorCompass.anchor`/`clearAnchor` and passes the resulting `EditorAnchoredRange` into delete/yank/surround and into `VisualHighlightRenderer`.
 - Calls `hardwareCursor.apply(mode)` on mode transitions and renders visual selections by invoking `visualHighlightRenderer.render` with the current range and a style function.
 
 Downstream, every controller ultimately reads from and writes to Pi's editor internals through `getEditorInternals`:
 
-- `MovementController` and `TextEditController` read `editor.getCursor()`/`getLines()` and write `state.cursorLine`, `state.cursorCol`, and `state.lines`.
-- `TextEditController` pushes snapshots to `internal.undoStack` / `internal.pushUndoSnapshot()` and triggers `internal.onChange` and `internal.tui.requestRender()`.
-- `VisualHighlightRenderer` reads `internal.scrollOffset`, `internal.lastWidth`, `internal.focused`, `internal.segment`, and `internal.tui.getShowHardwareCursor()`.
+- `MovementController` and `TextEditController` read `editor.getCursor()`/`getLines()` and write `state.cursorLine`, `state.cursorCol`, and `state.lines`; movement requests rendering through its injected host service while cursor writes remain direct adapter operations.
+- `TextEditController` pushes complete snapshots to `internal.undoStack` / `internal.pushUndoSnapshot()` when available, otherwise its local fallback, and uses injected host services for change notification and rendering.
+- `VisualHighlightRenderer` receives focus, hardware-cursor visibility, and per-render scroll offset through `EditorHostServices`/render options, and reads only retained `internal.lastWidth` and `internal.segment`.
 - `HardwareCursorController` reads `tui.getShowHardwareCursor()` and writes ANSI escape sequences to `tui.terminal`.
+
+The protected `VimModalEditor.renderTopBorder`/`renderBottomBorder` hooks preserve Pi's border output while exposing scroll placement and composing the modal label. `test/vim-modal-editor-render.test.ts` covers this integration, and `test/paste-undo-redo.test.ts` covers paste metadata through undo/redo and raw-state fallback behavior.
 
 This keeps `src/editor/` a thin, contained adapter layer: it does not own key parsing, command grammar, or mode state, but it provides all the buffer-aware operations the modal layer needs to implement Vim-style editing on top of Pi's existing editor widget.
