@@ -13,7 +13,8 @@
         "normal": "#55BBF9",
         "insert": "#72F6B2",
         "visual": "#D498F8",
-        "visualLine": "#D498F8"
+        "visualLine": "#D498F8",
+        "replace": "#FDF980"
       },
       "type": "object",
       "properties": {
@@ -36,13 +37,19 @@
           "default": "#D498F8",
           "type": "string",
           "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "replace": {
+          "default": "#FDF980",
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
         }
       },
       "required": [
         "normal",
         "insert",
         "visual",
-        "visualLine"
+        "visualLine",
+        "replace"
       ],
       "additionalProperties": false
     },

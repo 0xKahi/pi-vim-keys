@@ -25,13 +25,13 @@ const editorTheme: EditorTheme = {
 };
 const theme = { bg: (_name: string, text: string) => `\x1b[48;2;80;80;80m${text}\x1b[49m` } as unknown as Theme;
 
-function makeEditor(text = 'one\ntwo\nthree', hardwareCursor = false) {
+function makeEditor(text = 'one\ntwo\nthree', hardwareCursor = false, config = new ConfigLoader()) {
   const terminal = { rows: 8, columns: 120, write() {}, on() {}, off() {}, hideCursor() {}, showCursor() {} };
   const tui = new TuiMainScreen(terminal as unknown as ConstructorParameters<typeof TuiMainScreen>[0], hardwareCursor);
   const keybindings = new KeybindingsManager(TUI_KEYBINDINGS);
   setKeybindings(keybindings);
   const editor = new VimModalEditor(tui, editorTheme, keybindings as unknown as ConstructorParameters<typeof VimModalEditor>[2], {
-    config: new ConfigLoader(),
+    config,
     getTheme: () => theme,
     emitEvent: () => {},
   });
@@ -72,6 +72,37 @@ describe('VimModalEditor render integration', () => {
     const border = bottom(editor, 40);
     expect(border).toContain(plain(editor.modeLabel));
     expect(border).toContain('d');
+  });
+
+  it('shows the REPLACE label on the bottom border in replace mode', () => {
+    const { editor } = makeEditor();
+    editor.handleInput('R');
+
+    expect(bottom(editor, 40)).toContain('REPLACE');
+    expect(editor.modeLabel).toContain('REPLACE');
+  });
+
+  it('shows the replace operator pending hint beside the mode label', () => {
+    const { editor } = makeEditor();
+    editor.handleInput('r');
+
+    const border = bottom(editor, 40);
+    expect(border).toContain('r_');
+    expect(border).toContain(plain(editor.modeLabel));
+  });
+
+  it('renders the REPLACE label with the configured replace color', () => {
+    const config = new ConfigLoader();
+    const customColor = '#123456';
+    (config as unknown as { config: { colors: { replace: string } } }).config.colors.replace = customColor;
+    const { editor } = makeEditor('one\ntwo\nthree', false, config);
+    expect(editor.config.getModeColors('replace')).toBe(customColor);
+
+    editor.handleInput('R');
+
+    const expected = crayon.reverseVideo(crayon.colorize(' REPLACE ', { fg: customColor }));
+    const lines = editor.render(40);
+    expect(lines[lines.length - 1] ?? '').toContain(expected);
   });
 
   it('retains Pi scroll indicators alongside the mode label', () => {

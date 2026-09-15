@@ -4,6 +4,7 @@ import type { VimMode } from '../types';
 const HARDWARE_CURSOR_SHAPES = {
   normal: '\x1b[2 q', // steady block
   insert: '\x1b[6 q', // steady vertical bar
+  replace: '\x1b[4 q', // steady underline
   visual: '\x1b[2 q', // steady block
   visualLine: '\x1b[2 q', // steady block
 } satisfies Record<VimMode, string>;

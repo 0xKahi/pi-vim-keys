@@ -6,10 +6,11 @@ import { EditorCompassController } from './editor/editor-compass-controller';
 import { HardwareCursorController } from './editor/hardware-cursor-controller';
 import { MovementController } from './editor/movement-controller';
 import { TextEditController } from './editor/text-edit-controller';
-import type { EditorHostServices } from './editor/types';
+import { type EditorHostServices, getEditorInternals } from './editor/types';
 import { VisualHighlightRenderer } from './editor/visual-highlight-renderer';
 import { KeySequencer } from './key-sequencer';
 import { MultiCharKeySequence } from './key-sequencer/strategies/multi-char-sequence';
+import { PrintableCharKeySequence } from './key-sequencer/strategies/printable-char-sequence';
 import { SchemaBasedKeySequence } from './key-sequencer/strategies/schema-based-sequence';
 import { TimeBasedKeySequence } from './key-sequencer/strategies/time-based-sequence';
 import { CharOnlyKeySchema } from './schemas/key.schema';
@@ -17,6 +18,7 @@ import { AppKeybindingSchema } from './schemas/keybind.schema';
 import { SurroundPairs, type VimMode } from './types';
 import { crayon } from './utils/crayon.util';
 import { logKeyInput } from './utils/debug-input.util';
+import { keyToPrintableChar } from './utils/printable-char.util';
 import { formatModeLabel, isVisualMode } from './utils/vim-mode.util';
 
 const DEBUG_INPUT = false;
@@ -27,11 +29,18 @@ type VimModalEditorOpts = {
   emitEvent: (channel: string, data: unknown) => void;
 };
 
+type ReplaceSession = {
+  line: number;
+  entryCol: number;
+  originalLine: string;
+};
+
 export class VimModalEditor extends CustomEditor {
   private mode: VimMode = 'normal';
   private keySeq: Record<VimMode, KeySequencer> = {
     normal: new KeySequencer(),
     insert: new KeySequencer(),
+    replace: new KeySequencer(),
     visual: new KeySequencer(),
     visualLine: new KeySequencer(),
   };
@@ -43,6 +52,7 @@ export class VimModalEditor extends CustomEditor {
   private readonly compass: EditorCompassController;
   private readonly visualHighlight: VisualHighlightRenderer;
   private readonly hardwareCursor: HardwareCursorController;
+  private replaceSession: ReplaceSession | null = null;
   // Reset before each super.render, captured by Pi's top-border hook, then passed to the selection overlay.
   private topHiddenLineCount = 0;
 
@@ -148,6 +158,10 @@ export class VimModalEditor extends CustomEditor {
         this.handleVisualLineMode(data);
         return;
       }
+      case 'replace': {
+        this.handleReplaceMode(data);
+        return;
+      }
       default: {
         super.handleInput(data);
         return;
@@ -175,6 +189,33 @@ export class VimModalEditor extends CustomEditor {
     }
 
     super.handleInput(data);
+  }
+
+  private handleReplaceMode(data: string): void {
+    const parsed = parseKey(data);
+
+    if (parsed === 'escape') {
+      this.textEdit.endEditSession();
+      // move back to mimic vim cursor, unless we are at start of line
+      if (this.getCursor().col > 0) {
+        this.movement.move('left');
+      }
+      this.replaceSession = null;
+      this.setMode('normal');
+      return;
+    }
+
+    if (parsed === 'backspace') {
+      if (this.replaceSession) {
+        this.textEdit.restoreFromOriginal(this.replaceSession.entryCol, this.replaceSession.originalLine);
+      }
+      return;
+    }
+
+    const char = keyToPrintableChar(parsed);
+    if (char !== null) {
+      this.textEdit.overwriteAtCursor(char);
+    }
   }
 
   private handleNormalMode(data: string): void {
@@ -213,11 +254,29 @@ export class VimModalEditor extends CustomEditor {
       if (matched.leader === 'y' && matched?.seqKey) {
         if (this.handlePendingY(matched.seqKey)) return;
       }
+
+      if (matched.leader === 'r' && matched.seqKey) {
+        this.textEdit.replaceAtCursor(matched.seqKey);
+        return;
+      }
     }
 
     if (this.handleBackToInsertMode(data)) return;
     if (data === 'v' && this.setMode('visual')) return;
     if (data === 'V' && this.setMode('visualLine')) return;
+    if (data === 'R') {
+      const state = getEditorInternals(this).state;
+      if (state) {
+        this.replaceSession = {
+          line: state.cursorLine,
+          entryCol: state.cursorCol,
+          originalLine: state.lines[state.cursorLine] ?? '',
+        };
+        this.textEdit.beginEditSession();
+        this.setMode('replace');
+      }
+      return;
+    }
     if (this.handleMovementCommand(data)) return;
     if (this.handleNormalEditComands(data)) return;
 
@@ -482,6 +541,7 @@ export class VimModalEditor extends CustomEditor {
     this.keySeq.normal.register(new MultiCharKeySequence({ leader: 'g', sequences: ['g', 'e', 'E'] }));
     this.keySeq.normal.register(new MultiCharKeySequence({ leader: 'd', sequences: ['d'] }));
     this.keySeq.normal.register(new MultiCharKeySequence({ leader: 'y', sequences: ['y'] }));
+    this.keySeq.normal.register(new PrintableCharKeySequence({ leader: 'r' }));
   }
 
   private registerVisualModeSequences() {

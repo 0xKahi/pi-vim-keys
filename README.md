@@ -26,8 +26,9 @@ pi install npm:@0xkahi/pi-vim-keys -l
 
 ## ✨ Features
 
-- **Vim modes**: insert, normal, visual, and visual-line modes.
-- **Mode-aware cursor and colors**: configurable mode label colors, plus block cursor in normal/visual modes and bar cursor in insert mode when terminal hardware cursor is enabled.
+- **Vim modes**: insert, normal, visual, visual-line, and replace modes.
+- **Replace in place**: single-character replace with `r<char>` and a persistent REPLACE mode (`R`) that overtypes until `escape`, recorded as a single undo step.
+- **Mode-aware cursor and colors**: configurable mode label colors, plus block cursor in normal/visual modes, bar cursor in insert mode, and underline cursor in replace mode when terminal hardware cursor is enabled.
 - **Configurable insert-to-normal mapping**: use `escape` by default, or configure sequences like `jj` or `kj`.
 - **Normal-mode leader keybindings**: bind leader mappings to Pi app actions or extension commands.
 - **supports both single char and multichar sequence**: keybinds can be `<leader>e` or `<leader>oe`

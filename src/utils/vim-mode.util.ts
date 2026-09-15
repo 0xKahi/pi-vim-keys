@@ -5,6 +5,7 @@ const VISUAL_MODES: VimMode[] = ['visual', 'visualLine'];
 const MODE_TO_LABEL: Record<VimMode, string> = {
   insert: 'INSERT',
   normal: 'NORMAL',
+  replace: 'REPLACE',
   visual: 'VISUAL',
   visualLine: 'V-LINE',
 };
