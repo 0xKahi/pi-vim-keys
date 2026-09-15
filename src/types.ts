@@ -3,7 +3,7 @@ import z from 'zod';
 import type { SurroundOpts } from './editor/text-edit-controller';
 import type { CapitalLetterKey, MissingSymbolKey } from './schemas/key.schema';
 
-export const VimModeSchema = z.enum(['normal', 'insert', 'visual', 'visualLine']);
+export const VimModeSchema = z.enum(['normal', 'insert', 'visual', 'visualLine', 'replace']);
 export type VimMode = z.infer<typeof VimModeSchema>;
 
 export type VimKeyId = KeyId | CapitalLetterKey | MissingSymbolKey;

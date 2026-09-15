@@ -45,6 +45,8 @@ export class TextEditController {
   private readonly fallbackUndoStack: EditorSnapshot[] = [];
   private redoStack: RedoEntry[] = [];
   private register?: RegisterEntry;
+  private sessionActive = false;
+  private sessionStarted = false;
 
   constructor(
     private readonly editor: Editor,
@@ -201,6 +203,92 @@ export class TextEditController {
     state.lines.splice(insertAt, 0, after);
     state.cursorLine = insertAt;
     this.setCursorCol(0);
+    this.finishEdit();
+    return true;
+  }
+
+  beginEditSession(): void {
+    this.sessionActive = true;
+    this.sessionStarted = false;
+  }
+
+  endEditSession(): void {
+    this.sessionActive = false;
+  }
+
+  hasSessionEdits(): boolean {
+    return this.sessionStarted;
+  }
+
+  replaceAtCursor(char: string): boolean {
+    const state = this.getState();
+    if (!state) return false;
+
+    this.normalizeState(state);
+    const line = state.lines[state.cursorLine] ?? '';
+    if (state.cursorCol >= line.length) return false;
+
+    const current = this.segment(line.slice(state.cursorCol))[0];
+    if (!current) return false;
+
+    const end = state.cursorCol + current.segment.length;
+
+    this.startEdit();
+    state.lines[state.cursorLine] = line.slice(0, state.cursorCol) + char + line.slice(end);
+    this.finishEdit();
+    return true;
+  }
+
+  overwriteAtCursor(char: string): boolean {
+    const state = this.getState();
+    if (!state) return false;
+
+    this.normalizeState(state);
+    const line = state.lines[state.cursorLine] ?? '';
+
+    this.startEdit();
+    if (state.cursorCol >= line.length) {
+      state.lines[state.cursorLine] = line + char;
+    } else {
+      const current = this.segment(line.slice(state.cursorCol))[0];
+      const end = state.cursorCol + (current?.segment.length ?? char.length);
+      state.lines[state.cursorLine] = line.slice(0, state.cursorCol) + char + line.slice(end);
+    }
+    this.setCursorCol(state.cursorCol + char.length);
+    this.finishEdit();
+    return true;
+  }
+
+  restoreFromOriginal(entryCol: number, originalLine: string): boolean {
+    const state = this.getState();
+    if (!state) return false;
+
+    this.normalizeState(state);
+
+    if (state.cursorCol <= entryCol) {
+      if (state.cursorCol === 0) return false;
+
+      const previous = this.previousGraphemeCoordinate({ line: state.cursorLine, col: state.cursorCol }, state);
+      this.setCursorCol(previous.col);
+      this.finishEdit();
+      return true;
+    }
+
+    const line = state.lines[state.cursorLine] ?? '';
+    const keptGraphemes = this.segment(line.slice(entryCol, state.cursorCol)).slice(0, -1);
+    const newTyped = keptGraphemes.map(grapheme => grapheme.segment).join('');
+
+    const originalGraphemes = this.segment(originalLine.slice(entryCol));
+    let consumed = 0;
+    for (let index = 0; index < keptGraphemes.length && index < originalGraphemes.length; index++) {
+      consumed += originalGraphemes[index]?.segment.length ?? 0;
+    }
+
+    const newLine = originalLine.slice(0, entryCol) + newTyped + originalLine.slice(entryCol + consumed);
+
+    this.startEdit();
+    state.lines[state.cursorLine] = newLine;
+    this.setCursorCol(entryCol + newTyped.length);
     this.finishEdit();
     return true;
   }
@@ -512,12 +600,16 @@ export class TextEditController {
   }
 
   private startEdit(): void {
+    if (this.sessionActive && this.sessionStarted) return;
+
     const internal = this.getInternal();
     internal.cancelAutocomplete?.();
     internal.historyIndex = -1;
     internal.lastAction = null;
     this.clearRedoStack();
     this.pushUndoSnapshot();
+
+    if (this.sessionActive) this.sessionStarted = true;
   }
 
   private finishEdit(): void {

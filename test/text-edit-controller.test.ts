@@ -164,3 +164,162 @@ describe('TextEditController.deleteRange', () => {
     expect(editor.getCursor()).toEqual({ line: 0, col: 2 });
   });
 });
+
+describe('TextEditController.replaceAtCursor', () => {
+  it('replaces the grapheme under the cursor and keeps the cursor in place', () => {
+    const editor = makeEditor('abcde');
+    const controller = new TextEditController(editor, host(editor));
+    setCursor(editor, 0, 2);
+
+    expect(controller.replaceAtCursor('X')).toBe(true);
+    expect(editor.getText()).toBe('abXde');
+    expect(editor.getCursor()).toEqual({ line: 0, col: 2 });
+  });
+
+  it('returns false and mutates nothing at or past the end of the line', () => {
+    const editor = makeEditor('abc');
+    const controller = new TextEditController(editor, host(editor));
+
+    setCursor(editor, 0, 3);
+    expect(controller.replaceAtCursor('X')).toBe(false);
+    expect(editor.getText()).toBe('abc');
+
+    setCursor(editor, 0, 8);
+    expect(controller.replaceAtCursor('X')).toBe(false);
+    expect(editor.getText()).toBe('abc');
+  });
+
+  it('returns false on an empty line', () => {
+    const editor = makeEditor('');
+    const controller = new TextEditController(editor, host(editor));
+
+    expect(controller.replaceAtCursor('X')).toBe(false);
+    expect(editor.getText()).toBe('');
+  });
+});
+
+describe('TextEditController.overwriteAtCursor', () => {
+  it('overwrites mid-line without changing the line length and advances the cursor', () => {
+    const editor = makeEditor('abcde');
+    const controller = new TextEditController(editor, host(editor));
+    setCursor(editor, 0, 1);
+
+    expect(controller.overwriteAtCursor('X')).toBe(true);
+    expect(editor.getText()).toBe('aXcde');
+    expect(editor.getCursor()).toEqual({ line: 0, col: 2 });
+  });
+
+  it('appends and grows the line when the cursor is at the end of the line', () => {
+    const editor = makeEditor('abc');
+    const controller = new TextEditController(editor, host(editor));
+    setCursor(editor, 0, 3);
+
+    expect(controller.overwriteAtCursor('X')).toBe(true);
+    expect(editor.getText()).toBe('abcX');
+    expect(editor.getCursor()).toEqual({ line: 0, col: 4 });
+  });
+});
+
+describe('TextEditController.restoreFromOriginal', () => {
+  it('restores a partially overtyped run from the original line', () => {
+    const editor = makeEditor('abcde');
+    const controller = new TextEditController(editor, host(editor));
+    setCursor(editor, 0, 0);
+
+    controller.beginEditSession();
+    expect(controller.overwriteAtCursor('X')).toBe(true);
+    expect(controller.overwriteAtCursor('Y')).toBe(true);
+    expect(editor.getText()).toBe('XYcde');
+
+    expect(controller.restoreFromOriginal(0, 'abcde')).toBe(true);
+    expect(editor.getText()).toBe('Xbcde');
+    expect(editor.getCursor()).toEqual({ line: 0, col: 1 });
+  });
+
+  it('restores a fully overtyped run back to the exact original content', () => {
+    const editor = makeEditor('abcde');
+    const controller = new TextEditController(editor, host(editor));
+    setCursor(editor, 0, 0);
+
+    controller.beginEditSession();
+    expect(controller.overwriteAtCursor('X')).toBe(true);
+    expect(controller.overwriteAtCursor('Y')).toBe(true);
+
+    expect(controller.restoreFromOriginal(0, 'abcde')).toBe(true);
+    expect(controller.restoreFromOriginal(0, 'abcde')).toBe(true);
+    expect(editor.getText()).toBe('abcde');
+    expect(editor.getCursor()).toEqual({ line: 0, col: 0 });
+  });
+
+  it('moves the cursor left without mutating when at or before the entry column', () => {
+    const editor = makeEditor('abcdef');
+    const controller = new TextEditController(editor, host(editor));
+    setCursor(editor, 0, 2);
+
+    expect(controller.restoreFromOriginal(2, 'abcdef')).toBe(true);
+    expect(editor.getText()).toBe('abcdef');
+    expect(editor.getCursor()).toEqual({ line: 0, col: 1 });
+
+    expect(controller.restoreFromOriginal(2, 'abcdef')).toBe(true);
+    expect(editor.getText()).toBe('abcdef');
+    expect(editor.getCursor()).toEqual({ line: 0, col: 0 });
+
+    expect(controller.restoreFromOriginal(2, 'abcdef')).toBe(false);
+    expect(editor.getText()).toBe('abcdef');
+    expect(editor.getCursor()).toEqual({ line: 0, col: 0 });
+  });
+
+  it('removes characters appended past the original end of line', () => {
+    const editor = makeEditor('ab');
+    const controller = new TextEditController(editor, host(editor));
+    setCursor(editor, 0, 2);
+
+    controller.beginEditSession();
+    expect(controller.overwriteAtCursor('x')).toBe(true);
+    expect(controller.overwriteAtCursor('y')).toBe(true);
+    expect(editor.getText()).toBe('abxy');
+
+    expect(controller.restoreFromOriginal(2, 'ab')).toBe(true);
+    expect(editor.getText()).toBe('abx');
+    expect(editor.getCursor()).toEqual({ line: 0, col: 3 });
+  });
+});
+
+describe('TextEditController edit sessions', () => {
+  it('coalesces several mutations into exactly one undo entry', () => {
+    const editor = makeEditor('abc');
+    const controller = new TextEditController(editor, host(editor));
+    setCursor(editor, 0, 0);
+
+    controller.beginEditSession();
+    expect(controller.overwriteAtCursor('x')).toBe(true);
+    expect(controller.overwriteAtCursor('y')).toBe(true);
+    expect(controller.overwriteAtCursor('z')).toBe(true);
+    controller.endEditSession();
+
+    expect(editor.getText()).toBe('xyz');
+    expect(controller.hasSessionEdits()).toBe(true);
+
+    expect(controller.undo()).toBe(true);
+    expect(editor.getText()).toBe('abc');
+    expect(editor.getCursor()).toEqual({ line: 0, col: 0 });
+  });
+
+  it('creates no undo entry and preserves redo history for a session with no mutations', () => {
+    const editor = makeEditor('abc');
+    const controller = new TextEditController(editor, host(editor));
+    setCursor(editor, 0, 0);
+
+    expect(controller.delete('forward')).toBe(true);
+    expect(editor.getText()).toBe('bc');
+    expect(controller.undo()).toBe(true);
+    expect(editor.getText()).toBe('abc');
+
+    controller.beginEditSession();
+    controller.endEditSession();
+    expect(controller.hasSessionEdits()).toBe(false);
+
+    expect(controller.redo()).toBe(true);
+    expect(editor.getText()).toBe('bc');
+  });
+});

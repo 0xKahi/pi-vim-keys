@@ -20,7 +20,8 @@ Nested `colors` and `keybinds` objects are merged key-by-key. If `normalModeRema
     "normal": "#55BBF9",
     "insert": "#72F6B2",
     "visual": "#D498F8",
-    "visualLine": "#D498F8"
+    "visualLine": "#D498F8",
+    "replace": "#FDF980"
   },
   "normalModeRemap": {
     "type": "single",
@@ -48,7 +49,8 @@ Each value must be a hex color in `#RRGGBB` format.
     "normal": "#55BBF9",
     "insert": "#72F6B2",
     "visual": "#D498F8",
-    "visualLine": "#D498F8"
+    "visualLine": "#D498F8",
+    "replace": "#FDF980"
   }
 }
 ```
