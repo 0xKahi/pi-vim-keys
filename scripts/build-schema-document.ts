@@ -4,6 +4,9 @@ import { PiVimKeysConfigSchema } from '../src/schemas/config.schema';
 export function createConfigJsonSchema(): Record<string, unknown> {
   const jsonSchema = z.toJSONSchema(PiVimKeysConfigSchema, {
     target: 'draft-7',
+    // Generate the input representation so defaulted fields are optional in
+    // user config files rather than being marked required (output mode).
+    io: 'input',
     unrepresentable: 'any',
   }) as Record<string, unknown>;
 
