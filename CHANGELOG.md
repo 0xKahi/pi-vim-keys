@@ -1,5 +1,11 @@
 # @0xkahi/pi-vim-keys
 
+## 1.1.1
+
+### Patch Changes
+
+- 750d8ca: upgrade pi deps to v0.87.0
+
 ## 1.1.0
 
 ### Minor Changes
