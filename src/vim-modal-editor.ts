@@ -35,6 +35,8 @@ type ReplaceSession = {
   originalLine: string;
 };
 
+type CharSearchLeaderKey = 'f' | 'F';
+
 export class VimModalEditor extends CustomEditor {
   private mode: VimMode = 'normal';
   private keySeq: Record<VimMode, KeySequencer> = {
@@ -55,6 +57,7 @@ export class VimModalEditor extends CustomEditor {
   private replaceSession: ReplaceSession | null = null;
   // Reset before each super.render, captured by Pi's top-border hook, then passed to the selection overlay.
   private topHiddenLineCount = 0;
+  private lastCharSearch: { leader: CharSearchLeaderKey; char: string } | null = null;
 
   kb: KeybindingsManager;
 
@@ -233,13 +236,9 @@ export class VimModalEditor extends CustomEditor {
         this.handleActionCommands(matched.seqKey, true);
         return;
       }
-      if (matched.leader === 'f' && matched?.seqKey) {
-        this.movement.findChar('forward', matched?.seqKey);
-        return;
-      }
 
-      if (matched.leader === 'F' && matched?.seqKey) {
-        this.movement.findChar('backward', matched?.seqKey);
+      if ((matched.leader === 'f' || matched.leader === 'F') && matched?.seqKey) {
+        this.handleCharSearch({ leader: matched.leader, char: matched.seqKey, save: true });
         return;
       }
 
@@ -277,6 +276,7 @@ export class VimModalEditor extends CustomEditor {
       }
       return;
     }
+    if (this.handleRepeatCharSearch(data)) return;
     if (this.handleMovementCommand(data)) return;
     if (this.handleNormalEditComands(data)) return;
 
@@ -300,13 +300,8 @@ export class VimModalEditor extends CustomEditor {
 
     if (result === 'completed' && matched) {
       this.tui.requestRender();
-      if (matched.leader === 'f') {
-        this.movement.findChar('forward', data);
-        return;
-      }
-
-      if (matched.leader === 'F') {
-        this.movement.findChar('backward', data);
+      if ((matched.leader === 'f' || matched.leader === 'F') && matched?.seqKey) {
+        this.handleCharSearch({ leader: matched.leader, char: matched.seqKey, save: true });
         return;
       }
 
@@ -320,6 +315,7 @@ export class VimModalEditor extends CustomEditor {
     }
 
     if (this.handleEscapeVisualCommand(data)) return;
+    if (this.handleRepeatCharSearch(data)) return;
     if (this.handleMovementCommand(data)) return;
     if (this.handleVisualEditCommands(data)) return;
   }
@@ -334,13 +330,8 @@ export class VimModalEditor extends CustomEditor {
 
     if (result === 'completed' && matched) {
       this.tui.requestRender();
-      if (matched.leader === 'f') {
-        this.movement.findChar('forward', data);
-        return;
-      }
-
-      if (matched.leader === 'F') {
-        this.movement.findChar('backward', data);
+      if ((matched.leader === 'f' || matched.leader === 'F') && matched?.seqKey) {
+        this.handleCharSearch({ leader: matched.leader, char: matched.seqKey, save: true });
         return;
       }
 
@@ -354,6 +345,7 @@ export class VimModalEditor extends CustomEditor {
     }
 
     if (this.handleEscapeVisualCommand(data)) return;
+    if (this.handleRepeatCharSearch(data)) return;
     if (this.handleMovementCommand(data)) return;
     if (this.handleVisualEditCommands(data)) return;
   }
@@ -515,6 +507,29 @@ export class VimModalEditor extends CustomEditor {
       return true;
     }
     this.emitEvent(bind, '');
+    return true;
+  }
+
+  private handleCharSearch({ leader, char, save }: { leader: CharSearchLeaderKey; char: string; save: boolean }) {
+    if (save) {
+      this.lastCharSearch = { leader, char };
+    }
+
+    if (leader === 'f') {
+      this.movement.findChar('forward', char);
+      return;
+    }
+
+    if (leader === 'F') {
+      this.movement.findChar('backward', char);
+      return;
+    }
+  }
+
+  private handleRepeatCharSearch(data: string): boolean {
+    if (data !== ';' || !this.lastCharSearch) return false;
+
+    this.handleCharSearch({ ...this.lastCharSearch, save: false });
     return true;
   }
 
