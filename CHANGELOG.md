@@ -1,5 +1,11 @@
 # @0xkahi/pi-vim-keys
 
+## 1.1.2
+
+### Patch Changes
+
+- 6fbb699: added vim `;` repeat char search keybind
+
 ## 1.1.1
 
 ### Patch Changes
