@@ -21,13 +21,15 @@ Nested `colors` and `keybinds` objects are merged key-by-key. If `normalModeRema
     "insert": "#72F6B2",
     "visual": "#D498F8",
     "visualLine": "#D498F8",
-    "replace": "#FDF980"
+    "replace": "#FDF980",
+    "altScreen": "#ED7892"
   },
   "normalModeRemap": {
     "type": "single",
     "key": "escape"
   },
   "keybinds": {
+    "ctrl+w": "pi.vimKeys.altScreenMode",
     "<leader>oe": "app.editor.external",
     "<leader>p": "app.clipboard.pasteImage",
     "<leader>l": "app.session.resume",
@@ -39,7 +41,7 @@ Nested `colors` and `keybinds` objects are merged key-by-key. If `normalModeRema
 
 ## Colors
 
-Controls the color of the mode label shown in the editor border.
+Controls the color of the mode label shown in the editor bottom border. `colors.altScreen` sets the `ALT-S` label color and defaults to `#ED7892`. Like other mode colors, it can be overridden in global or project configuration.
 
 Each value must be a hex color in `#RRGGBB` format.
 
@@ -50,7 +52,8 @@ Each value must be a hex color in `#RRGGBB` format.
     "insert": "#72F6B2",
     "visual": "#D498F8",
     "visualLine": "#D498F8",
-    "replace": "#FDF980"
+    "replace": "#FDF980",
+    "altScreen": "#ED7892"
   }
 }
 ```
@@ -98,6 +101,27 @@ Allowed keybind keys:
 
 Allowed base keys include lowercase letters, uppercase letters for leader bindings, digits, common symbols, and special keys such as `escape`, `enter`, `tab`, `space`, `backspace`, `delete`, arrow keys, and `f1` through `f12`.
 
+Keybindings are dispatched only from normal mode. `keybinds` defaults to `{}`: no actions have default bindings. Targets can be built-in vim-keys editor actions, Pi app actions, or external extension events.
+
+### Built-in Editor Keybindings
+
+| Action | Description |
+| --- | --- |
+| `pi.vimKeys.altScreenMode` | Enter [alt-screen mode](alt-screen-mode.md) in Pi fullscreen; consume as a no-op outside fullscreen |
+
+Alt-screen mode has no default key. Bind it explicitly, using a modifier key or leader sequence:
+
+```json
+{
+  "keybinds": {
+    "ctrl+w": "pi.vimKeys.altScreenMode",
+    "<leader>s": "pi.vimKeys.altScreenMode"
+  }
+}
+```
+
+Both bindings above enter the same mode from normal mode only. Other editor modes keep their existing behavior. Pi consumes keys bound under `tui.altScreen.*` before the editor, so avoid those keys for entry.
+
 ### App Keybinds
 
 Maps normal-mode keys to Pi app keybindings. This supports all Pi app keybindings.
@@ -116,7 +140,7 @@ Maps normal-mode keys to Pi app keybindings. This supports all Pi app keybinding
 
 Extension keybindings let `pi-vim-keys` trigger other extensions through Pi's event bus.
 
-Any keybind value that starts with the event prefix `pi.vimKeys.event:` is treated as an extension event instead of a built-in Pi app keybinding. When the keybind is pressed in normal mode, `pi-vim-keys` emits that event channel:
+Any keybind value that starts with the event prefix `pi.vimKeys.event:` is treated as an extension event instead of a built-in editor action or Pi app keybinding. This external event prefix is unchanged. When the keybind is pressed in normal mode, `pi-vim-keys` emits that event channel:
 
 ```ts
 pi.events.emit('pi.vimKeys.event:your-extension-id', '');

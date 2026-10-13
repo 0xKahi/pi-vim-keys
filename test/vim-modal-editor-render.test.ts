@@ -6,6 +6,7 @@ import {
   KeybindingsManager,
   setKeybindings,
   TUI_KEYBINDINGS,
+  TuiAltScreen,
   TuiMainScreen,
   visibleWidth,
 } from '@earendil-works/pi-tui';
@@ -23,7 +24,10 @@ const editorTheme: EditorTheme = {
     noMatch: text => text,
   },
 };
-const theme = { bg: (_name: string, text: string) => `\x1b[48;2;80;80;80m${text}\x1b[49m` } as unknown as Theme;
+const theme = {
+  bg: (_name: string, text: string) => `\x1b[48;2;80;80;80m${text}\x1b[49m`,
+  fg: (_name: string, text: string) => `\x1b[37m${text}\x1b[39m`,
+} as unknown as Theme;
 
 function makeEditor(text = 'one\ntwo\nthree', hardwareCursor = false, config = new ConfigLoader()) {
   const terminal = { rows: 8, columns: 120, write() {}, on() {}, off() {}, hideCursor() {}, showCursor() {} };
@@ -54,6 +58,58 @@ function bottom(editor: VimModalEditor, width: number): string {
 }
 
 describe('VimModalEditor render integration', () => {
+  it('renders ALT-S on the bottom border without adding rows or moving the cursor marker', () => {
+    const config = new ConfigLoader();
+    (config as unknown as { config: { keybinds: Record<string, string> } }).config.keybinds = {
+      'ctrl+w': 'pi.vimKeys.altScreenMode',
+    };
+    (config as unknown as { initializeAppKeybindingMaps(): void }).initializeAppKeybindingMaps();
+    const { editor, tui } = makeEditor('cursor', true, config);
+    const before = editor.render(80);
+    Object.setPrototypeOf(tui, TuiAltScreen.prototype);
+    editor.handleInput('\x17');
+    const during = editor.render(80);
+    expect(during.length).toBe(before.length);
+    expect(during[0]).toBe(before[0]);
+    expect(plain(during.at(-1) ?? '')).toContain(' ALT-S ');
+    expect(during.some(line => plain(line).includes('leave alt-screen mode'))).toBe(false);
+    const markerRow = before.findIndex(line => line.includes(CURSOR_MARKER));
+    expect(markerRow).toBeGreaterThanOrEqual(0);
+    expect(during[markerRow]).toBe(before[markerRow]);
+    expect(during[markerRow]).not.toContain('\x1b[7m');
+    assertWidth(during, 80);
+    editor.handleInput(' ');
+    expect(bottom(editor, 80)).toContain(' ALT-S <leader>_ ');
+    editor.handleInput('\x1b');
+    expect(editor.render(80)).toEqual(before);
+  });
+
+  it('uses the default and overridden alt-screen label color', () => {
+    for (const color of ['#ED7892', '#123456']) {
+      const config = new ConfigLoader();
+      (config as unknown as { config: { keybinds: Record<string, string> } }).config.keybinds = { 'ctrl+w': 'pi.vimKeys.altScreenMode' };
+      (config as unknown as { initializeAppKeybindingMaps(): void }).initializeAppKeybindingMaps();
+      if (color !== '#ED7892') {
+        (config as unknown as { config: { colors: { altScreen: string } } }).config.colors.altScreen = color;
+      }
+      const { editor, tui } = makeEditor('cursor', false, config);
+      Object.setPrototypeOf(tui, TuiAltScreen.prototype);
+      editor.handleInput('\x17');
+      expect(editor.config.getModeColors('altScreen')).toBe(color);
+      const expected = crayon.reverseVideo(crayon.colorize(' ALT-S ', { fg: color }));
+      expect(editor.render(40).at(-1) ?? '').toContain(expected);
+      for (const width of [10, 20]) assertWidth(editor.render(width), width);
+    }
+  });
+
+  for (const key of ['', 'i', 'v', 'V', 'R']) {
+    it(`renders no indicator row in other modes (entry ${key || 'normal'})`, () => {
+      const { editor } = makeEditor();
+      if (key) editor.handleInput(key);
+      expect(editor.render(80).some(line => plain(line).includes('leave alt-screen mode'))).toBe(false);
+    });
+  }
+
   it('puts every mode label on the Pi bottom border', () => {
     const { editor } = makeEditor();
     expect(bottom(editor, 40)).toContain(plain(editor.modeLabel));
@@ -191,6 +247,7 @@ describe('VimModalEditor render integration', () => {
     expect(hardwareCursorLine).toContain(CURSOR_MARKER);
     expect(hardwareCursorLine).not.toContain('\x1b[7m');
     expect(fakeCursorLine).toContain(CURSOR_MARKER);
-    expect(fakeCursorLine).toContain('\x1b[7m');
+    // Newer Pi versions defer fake-cursor styling to the TUI compositor.
+    expect(fakeCursorLine.includes('\x1b[7m') || fakeCursorLine.includes('\x1b_pi:fc\x07')).toBe(true);
   });
 });

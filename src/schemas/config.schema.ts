@@ -11,6 +11,7 @@ const ModeColorConfigSchema = z.object({
   visual: HtmlColorInputSchema.optional().default('#D498F8'),
   visualLine: HtmlColorInputSchema.optional().default('#D498F8'),
   replace: HtmlColorInputSchema.optional().default('#FDF980'),
+  altScreen: HtmlColorInputSchema.optional().default('#ED7892'),
 });
 
 const NormalModeSingleKeySchema = z.object({
@@ -36,6 +37,7 @@ export const PiVimKeysConfigSchema = z.object({
     visual: '#D498F8',
     visualLine: '#D498F8',
     replace: '#FDF980',
+    altScreen: '#ED7892',
   }),
   normalModeRemap: NormalModeConfigSchema.default({
     type: 'single',

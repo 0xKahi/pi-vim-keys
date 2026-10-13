@@ -25,6 +25,12 @@ const APP_KEYBINDINGS = {
 export const AppKeybindingSchema = z.enum(Object.keys(APP_KEYBINDINGS) as [keyof typeof APP_KEYBINDINGS, ...(keyof typeof APP_KEYBINDINGS)[]]);
 export type AppKeybindingId = z.infer<typeof AppKeybindingSchema>;
 
-export const ExtensionKeybindSchema = z.templateLiteral([z.literal('pi.vimKeys.event:'), z.string()]);
-export const CombinedKeybindSchema = z.union([ExtensionKeybindSchema, AppKeybindingSchema]);
+export const VIM_KEYS_EDITOR_KEYBINDINGS = { 'pi.vimKeys.altScreenMode': true } as const;
+export const VimKeysEditorKeybindSchema = z.enum(
+  Object.keys(VIM_KEYS_EDITOR_KEYBINDINGS) as [keyof typeof VIM_KEYS_EDITOR_KEYBINDINGS, ...(keyof typeof VIM_KEYS_EDITOR_KEYBINDINGS)[]],
+);
+export type VimKeysEditorKeybindingId = z.infer<typeof VimKeysEditorKeybindSchema>;
+
+export const ExternalExtensionKeybindSchema = z.templateLiteral([z.literal('pi.vimKeys.event:'), z.string()]);
+export const CombinedKeybindSchema = z.union([VimKeysEditorKeybindSchema, ExternalExtensionKeybindSchema, AppKeybindingSchema]);
 export type CombinedKeybindId = z.infer<typeof CombinedKeybindSchema>;
