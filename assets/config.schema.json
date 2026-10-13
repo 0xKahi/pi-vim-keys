@@ -14,7 +14,8 @@
         "insert": "#72F6B2",
         "visual": "#D498F8",
         "visualLine": "#D498F8",
-        "replace": "#FDF980"
+        "replace": "#FDF980",
+        "altScreen": "#ED7892"
       },
       "type": "object",
       "properties": {
@@ -40,6 +41,11 @@
         },
         "replace": {
           "default": "#FDF980",
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "altScreen": {
+          "default": "#ED7892",
           "type": "string",
           "pattern": "^#[0-9a-fA-F]{6}$"
         }
@@ -470,6 +476,12 @@
       },
       "additionalProperties": {
         "anyOf": [
+          {
+            "type": "string",
+            "enum": [
+              "pi.vimKeys.altScreenMode"
+            ]
+          },
           {
             "type": "string",
             "pattern": "^(pi\\.vimKeys\\.event:)[\\s\\S]{0,}$"

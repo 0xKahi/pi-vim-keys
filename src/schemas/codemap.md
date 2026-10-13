@@ -29,18 +29,20 @@ This file maps Vim-style triggers to the actions they invoke:
 
 - `APP_KEYBINDINGS` is a const object that lists every supported application action (`app.interrupt`, `app.clear`, `app.exit`, `app.suspend`, `app.thinking.cycle`, `app.model.cycleForward`, `app.model.cycleBackward`, `app.model.select`, `app.tools.expand`, `app.thinking.toggle`, `app.editor.external`, `app.message.followUp`, `app.message.dequeue`, `app.clipboard.pasteImage`, `app.session.new`, `app.session.tree`, `app.session.fork`, `app.session.resume`). It is typed as a partial `Record<AppKeybinding, boolean>`.
 - `AppKeybindingSchema` is a `z.enum()` over the keys of `APP_KEYBINDINGS`.
-- `ExtensionKeybindSchema` is a template-literal schema for extension-internal events (`pi.vimKeys.event:<string>`).
-- `CombinedKeybindSchema` unions `AppKeybindingSchema` and `ExtensionKeybindSchema`; this is the value type stored under each configured Vim keybind.
+- `VIM_KEYS_EDITOR_KEYBINDINGS` lists built-in editor actions, currently only `pi.vimKeys.altScreenMode`.
+- `VimKeysEditorKeybindSchema` is a `z.enum()` over its keys, with inferred type `VimKeysEditorKeybindingId`.
+- `ExternalExtensionKeybindSchema` (renamed from `ExtensionKeybindSchema`) is a template-literal schema for external extension events; the user-facing prefix remains `pi.vimKeys.event:<string>`.
+- `CombinedKeybindSchema` unions `VimKeysEditorKeybindSchema`, `ExternalExtensionKeybindSchema`, and `AppKeybindingSchema`; this is the value type stored under each configured Vim keybind. Alt-screen entry has no default binding.
 
 ### `config.schema.ts` — Top-level configuration
 
 This file composes the previous layers into the user-facing config object:
 
 - `HtmlColorInputSchema` validates 7-character hex color strings (`#RRGGBB`) via `COLOR_HEX_REGEX` from `src/constants`.
-- `ModeColorConfigSchema` defines optional hex colors for `normal`, `insert`, `visual`, and `visualLine` modes, each with a default.
+- `ModeColorConfigSchema` defines optional hex colors for `normal`, `insert`, `visual`, `visualLine`, `replace`, and `altScreen` modes, each with a default (`altScreen`: `#ED7892`).
 - `NormalModeSingleKeySchema` and `NormalModeSequenceSchema` describe the two ways to return to normal mode: a single key (default `escape`) or a two-key sequence.
 - `NormalModeConfigSchema` is the union of those two shapes.
-- `KeybindConfigSchema` is a `z.partialRecord(VimKeybindSchema, CombinedKeybindSchema)`, meaning each key is a valid Vim keybind and each value is an application action or extension event.
+- `KeybindConfigSchema` is a `z.partialRecord(VimKeybindSchema, CombinedKeybindSchema)`, meaning each key is a valid Vim keybind and each value is a built-in editor action, application action, or external extension event. The record defaults to `{}`.
 - `PiVimKeysConfigSchema` is the full, default-populated configuration schema with `$schema`, `colors`, `normalModeRemap`, and `keybinds` fields.
 - `PartialPiVimKeysConfigSchema` is an optional variant of the same shape used when loading raw config files before merging with defaults.
 

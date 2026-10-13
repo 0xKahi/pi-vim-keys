@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'bun:test';
+import { readFileSync } from 'node:fs';
 import { z } from 'zod';
 import { createConfigJsonSchema } from '../scripts/build-schema-document';
+import { PartialPiVimKeysConfigSchema, PiVimKeysConfigSchema } from '../src/schemas/config.schema';
 
 type JsonObject = Record<string, unknown>;
 
@@ -28,6 +30,60 @@ function replaceSchema(): JsonObject {
 // has a default as required, rejecting legitimate partial configs.
 const validator = z.fromJSONSchema(generatedSchema as Parameters<typeof z.fromJSONSchema>[0]);
 
+describe('alt-screen mode config', () => {
+  it('defaults the alt-screen color in runtime and generated schemas', () => {
+    expect(PiVimKeysConfigSchema.parse({}).colors.altScreen).toBe('#ED7892');
+    expect(PiVimKeysConfigSchema.parse({ colors: {} }).colors.altScreen).toBe('#ED7892');
+    const altScreen = asObject(asObject(colorsSchema().properties).altScreen);
+    expect(altScreen.default).toBe('#ED7892');
+    expect(asObject(colorsSchema().default).altScreen).toBe('#ED7892');
+  });
+
+  it('accepts an overridden alt-screen color and rejects invalid colors', () => {
+    const config = { colors: { altScreen: '#123456' } };
+    expect(PiVimKeysConfigSchema.parse(config).colors.altScreen).toBe('#123456');
+    expect(PartialPiVimKeysConfigSchema.parse(config).colors?.altScreen).toBe('#123456');
+    expect(validator.safeParse(config).success).toBe(true);
+    for (const schema of [PiVimKeysConfigSchema, PartialPiVimKeysConfigSchema, validator]) {
+      expect(schema.safeParse({ colors: { altScreen: 'invalid' } }).success).toBe(false);
+    }
+  });
+
+  it('has no default binding', () => {
+    expect(PiVimKeysConfigSchema.parse({}).keybinds).toEqual({});
+    expect(asObject(asObject(generatedSchema.properties).keybinds).default).toEqual({});
+  });
+
+  it('accepts editor actions and external events as keybind values', () => {
+    for (const key of ['ctrl+w', '<leader>s', '<leader>oe']) {
+      for (const binding of ['pi.vimKeys.altScreenMode', 'pi.vimKeys.event:x']) {
+        const config = { keybinds: { [key]: binding } };
+        expect(PiVimKeysConfigSchema.safeParse(config).success).toBe(true);
+        expect(PartialPiVimKeysConfigSchema.safeParse(config).success).toBe(true);
+        expect(validator.safeParse(config).success).toBe(true);
+      }
+    }
+  });
+
+  it('rejects unknown editor actions', () => {
+    const config = { keybinds: { 'ctrl+w': 'pi.vimKeys.foo' } };
+    expect(PiVimKeysConfigSchema.safeParse(config).success).toBe(false);
+    expect(PartialPiVimKeysConfigSchema.safeParse(config).success).toBe(false);
+    expect(validator.safeParse(config).success).toBe(false);
+  });
+
+  it('validates every JSON example in the configuration docs', () => {
+    const docs = readFileSync(new URL('../docs/configuration.md', import.meta.url), 'utf8');
+    const examples = [...docs.matchAll(/```json\n([\s\S]*?)\n```/g)];
+    expect(examples.length).toBeGreaterThan(0);
+    for (const example of examples) {
+      const config = JSON.parse(example[1] ?? '');
+      expect(PiVimKeysConfigSchema.safeParse(config).success).toBe(true);
+      expect(validator.safeParse(config).success).toBe(true);
+    }
+  });
+});
+
 describe('generated config JSON schema (issue 3 regression)', () => {
   it('does not require defaulted top-level fields', () => {
     expect(requiredKeys(generatedSchema)).not.toContain('colors');
@@ -37,7 +93,7 @@ describe('generated config JSON schema (issue 3 regression)', () => {
 
   it('does not require defaulted mode colors, including replace', () => {
     const required = requiredKeys(colorsSchema());
-    for (const mode of ['normal', 'insert', 'visual', 'visualLine', 'replace']) {
+    for (const mode of ['normal', 'insert', 'visual', 'visualLine', 'replace', 'altScreen']) {
       expect(required).not.toContain(mode);
     }
   });

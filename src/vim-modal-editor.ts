@@ -1,7 +1,8 @@
 import { CustomEditor, type KeybindingsManager, type Theme } from '@earendil-works/pi-coding-agent';
 import { type EditorTheme, matchesKey, parseKey, type TUI, truncateToWidth, visibleWidth } from '@earendil-works/pi-tui';
 import type { ConfigLoader } from './config-loader';
-import { DEFAULT_LEADER_KEY } from './constants';
+import { DEFAULT_KEY_TIMEOUT, DEFAULT_LEADER_KEY } from './constants';
+import { AltScreenController } from './editor/alt-screen-controller';
 import { EditorCompassController } from './editor/editor-compass-controller';
 import { HardwareCursorController } from './editor/hardware-cursor-controller';
 import { MovementController } from './editor/movement-controller';
@@ -14,7 +15,7 @@ import { PrintableCharKeySequence } from './key-sequencer/strategies/printable-c
 import { SchemaBasedKeySequence } from './key-sequencer/strategies/schema-based-sequence';
 import { TimeBasedKeySequence } from './key-sequencer/strategies/time-based-sequence';
 import { CharOnlyKeySchema } from './schemas/key.schema';
-import { AppKeybindingSchema } from './schemas/keybind.schema';
+import { AppKeybindingSchema, VimKeysEditorKeybindSchema } from './schemas/keybind.schema';
 import { SurroundPairs, type VimMode } from './types';
 import { crayon } from './utils/crayon.util';
 import { logKeyInput } from './utils/debug-input.util';
@@ -41,6 +42,7 @@ export class VimModalEditor extends CustomEditor {
   private mode: VimMode = 'normal';
   private keySeq: Record<VimMode, KeySequencer> = {
     normal: new KeySequencer(),
+    altScreen: new KeySequencer(),
     insert: new KeySequencer(),
     replace: new KeySequencer(),
     visual: new KeySequencer(),
@@ -54,6 +56,7 @@ export class VimModalEditor extends CustomEditor {
   private readonly compass: EditorCompassController;
   private readonly visualHighlight: VisualHighlightRenderer;
   private readonly hardwareCursor: HardwareCursorController;
+  private readonly altScreen: AltScreenController;
   private replaceSession: ReplaceSession | null = null;
   // Reset before each super.render, captured by Pi's top-border hook, then passed to the selection overlay.
   private topHiddenLineCount = 0;
@@ -77,10 +80,12 @@ export class VimModalEditor extends CustomEditor {
     this.textEdit = new TextEditController(this, host);
     this.compass = new EditorCompassController(this);
     this.visualHighlight = new VisualHighlightRenderer(this, host);
+    this.altScreen = new AltScreenController(this.tui);
     this.hardwareCursor = new HardwareCursorController(tui);
     this.hardwareCursor.apply(this.mode);
     this.registerInsertModeSequences();
     this.registerNormalModeSequences();
+    this.registerAltScreenModeSequences();
     this.registerVisualModeSequences();
     this.registerVisualLineModeSequences();
   }
@@ -100,6 +105,13 @@ export class VimModalEditor extends CustomEditor {
     if (isVisualMode(mode)) {
       const anchorType = mode === 'visualLine' ? 'line' : 'cursor';
       this.compass.anchor(anchorType);
+    }
+
+    if (currentMode === 'altScreen' || mode === 'altScreen') {
+      this.keySeq.altScreen = new KeySequencer();
+      this.registerAltScreenModeSequences();
+      this.keySeq.normal = new KeySequencer();
+      this.registerNormalModeSequences();
     }
 
     this.mode = mode;
@@ -159,6 +171,10 @@ export class VimModalEditor extends CustomEditor {
       }
       case 'visualLine': {
         this.handleVisualLineMode(data);
+        return;
+      }
+      case 'altScreen': {
+        this.handleAltScreenMode(data);
         return;
       }
       case 'replace': {
@@ -221,7 +237,56 @@ export class VimModalEditor extends CustomEditor {
     }
   }
 
+  private enterAltScreen(): void {
+    if (this.altScreen.isAvailable()) this.setMode('altScreen');
+  }
+
+  private handleAltScreenMode(data: string): void {
+    if (!this.altScreen.isAvailable()) {
+      this.setMode('normal');
+      this.handleNormalMode(data);
+      return;
+    }
+
+    const { result, matched } = this.keySeq.altScreen.match(data);
+    if (result === 'pending') {
+      this.tui.requestRender();
+      return;
+    }
+    if (result === 'completed' && matched) {
+      if (matched.leader === 'g' && matched.seqKey === 'g') this.altScreen.scrollToTop();
+      if (matched.leader === DEFAULT_LEADER_KEY && matched.seqKey === '/') this.altScreen.openSearch();
+      return;
+    }
+
+    if (matchesKey(data, 'escape')) {
+      this.setMode('normal');
+      return;
+    }
+    switch (data) {
+      case 'j':
+        this.altScreen.scrollLines(1);
+        break;
+      case 'k':
+        this.altScreen.scrollLines(-1);
+        break;
+      case 'd':
+        this.altScreen.scrollHalfPage(1);
+        break;
+      case 'u':
+        this.altScreen.scrollHalfPage(-1);
+        break;
+      case 'G':
+        this.altScreen.scrollToBottom();
+        break;
+      case 'i':
+        this.setMode('insert');
+        break;
+    }
+  }
+
   private handleNormalMode(data: string): void {
+    const parsed = parseKey(data);
     const { result, matched } = this.keySeq.normal.match(data);
 
     if (result === 'pending') {
@@ -286,7 +351,6 @@ export class VimModalEditor extends CustomEditor {
       return;
     }
     // handle app actions key bindings
-    const parsed = parseKey(data);
     if (parsed && this.handleActionCommands(parsed, false)) return;
   }
 
@@ -498,6 +562,13 @@ export class VimModalEditor extends CustomEditor {
   private handleActionCommands(data: string, leaderKey: boolean): boolean {
     const bind = this.config.getActionKeybindingForKey({ key: data, leaderKey });
     if (!bind) return false;
+
+    const editorBinding = VimKeysEditorKeybindSchema.safeParse(bind);
+    if (editorBinding.success) {
+      if (editorBinding.data === 'pi.vimKeys.altScreenMode') this.enterAltScreen();
+      return true;
+    }
+
     const { success, data: parsed } = AppKeybindingSchema.safeParse(bind);
     if (success && data) {
       if (parsed === 'app.interrupt') this.onEscape?.();
@@ -571,5 +642,10 @@ export class VimModalEditor extends CustomEditor {
     this.keySeq.visualLine.register(new SchemaBasedKeySequence({ leader: 'F', schema: CharOnlyKeySchema }));
     this.keySeq.visualLine.register(new MultiCharKeySequence({ leader: 'g', sequences: ['g', 'e', 'E'] }));
     this.keySeq.visualLine.register(new MultiCharKeySequence({ leader: 's', sequences: Object.keys(SurroundPairs) }));
+  }
+
+  private registerAltScreenModeSequences() {
+    this.keySeq.altScreen.register(new MultiCharKeySequence({ leader: 'g', sequences: ['g'] }));
+    this.keySeq.altScreen.register(new TimeBasedKeySequence({ leader: DEFAULT_LEADER_KEY, sequences: ['/'], timeout: DEFAULT_KEY_TIMEOUT }));
   }
 }

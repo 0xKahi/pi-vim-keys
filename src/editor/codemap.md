@@ -6,9 +6,10 @@ The `src/editor/` folder implements the low-level editing primitives for the `pi
 
 ## Design
 
-The folder is split into one helper type file and five controllers, each with a narrow, non-overlapping responsibility:
+The folder is split into one helper type file and six controllers, each with a narrow, non-overlapping responsibility:
 
 - `types.ts` — Centralizes the single unsafe view into Pi's editor internals through `EditorInternals` and `getEditorInternals(editor)`. The retained surface is exactly buffer/cursor `state`, edit bookkeeping (`preferredVisualCol`, `snappedFromCursorCol`, `lastAction`, `historyIndex`), undo primitives (`undoStack`, `pushUndoSnapshot`, `cancelAutocomplete`), cursor movement (`moveCursor`), segmentation (`segment`), Pi's recorded `lastWidth`, and optional paste metadata (`pastes`, `pasteCounter`). Each field remains only for behavior unavailable through the public API; host focus, change callbacks, render requests, and hardware-cursor visibility arrive through `EditorHostServices` instead.
+- `alt-screen-controller.ts` — Fullscreen transcript adapter. Checks `tui instanceof TuiAltScreen` on every call (the renderer can change), delegates line/top/bottom scrolling to public APIs, and requests rendering after actions. Private `getPrimaryScrollView`, `toggleSearch`, and `activeSearch` access is isolated and feature-detected: half-page scrolling falls back to half the terminal rows, and search is a no-op when unavailable or already active.
 - `editor-compass-controller.ts` — Selection-intent calculator. It stores an `AnchorState` (`'cursor'` or `'line'`) and resolves it into an `EditorAnchoredRange` made of normalized `EditorRange[]` entries. The `end` coordinate is exclusive for character spans, and the controller advances it by one grapheme so that visual selections include the last character under the cursor.
 - `movement-controller.ts` — Vim-style cursor navigation. Uses Pi's `internal.moveCursor` when available; otherwise falls back to mutating `EditorState` directly. Supports basic arrow moves, word jumps (`start`/`end`, forward/backward), line/page leaps, and single-character `f`/`F`-style searches.
 - `text-edit-controller.ts` — Text mutation and register/undo state. Performs deletes, yanks, pastes, new-line insertion, surround wrapping, and undo/redo. Each edit follows the same transaction pattern: `startEdit()` (push undo snapshot, cancel autocomplete, clear redo stack), mutate buffer/cursor, `finishEdit()` (reset cursor bookkeeping, fire `onChange`, request render).
@@ -82,7 +83,9 @@ The editor controllers are owned and orchestrated by the modal layer (outside `s
 - Toggles anchors via `editorCompass.anchor`/`clearAnchor` and passes the resulting `EditorAnchoredRange` into delete/yank/surround and into `VisualHighlightRenderer`.
 - Calls `hardwareCursor.apply(mode)` on mode transitions and renders visual selections by invoking `visualHighlightRenderer.render` with the current range and a style function.
 
-Downstream, every controller ultimately reads from and writes to Pi's editor internals through `getEditorInternals`:
+Downstream, buffer-aware controllers use Pi's editor internals through `getEditorInternals`, while fullscreen and hardware-cursor adapters use the TUI:
+
+- `AltScreenController` operates on the current fullscreen transcript renderer rather than the editor buffer; its private-API compatibility view is contained in `alt-screen-controller.ts`.
 
 - `MovementController` and `TextEditController` read `editor.getCursor()`/`getLines()` and write `state.cursorLine`, `state.cursorCol`, and `state.lines`; movement requests rendering through its injected host service while cursor writes remain direct adapter operations.
 - `TextEditController` pushes complete snapshots to `internal.undoStack` / `internal.pushUndoSnapshot()` when available, otherwise its local fallback, and uses injected host services for change notification and rendering.
