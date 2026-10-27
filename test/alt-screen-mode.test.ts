@@ -128,13 +128,36 @@ describe('alt-screen mode', () => {
     const { editor, tui } = makeEditor();
     const cursor = editor.getCursor();
     editor.handleInput('\x17');
-    for (const key of ['j', 'k', 'd', 'u', 'G', 'g', 'g', ' ', '/']) editor.handleInput(key);
+    for (const key of ['j', 'k', '\x04', '\x15', 'G', 'g', 'g', ' ', '/']) editor.handleInput(key);
     expect(tui.scrollBy.mock.calls).toEqual([[1], [-1], [7], [-7]]);
     expect(tui.scrollToTop).toHaveBeenCalledTimes(1);
     expect(tui.scrollToBottom).toHaveBeenCalledTimes(1);
     expect(tui.toggleSearch).toHaveBeenCalledTimes(1);
     expect(editor.getText()).toBe('unchanged buffer');
     expect(editor.getCursor()).toEqual(cursor);
+    expect(inAltScreen(editor)).toBe(true);
+    expect(editor.modeLabel).toBe(' ALT-S ');
+  });
+
+  it('ignores plain d and u', () => {
+    const { editor, tui } = makeEditor();
+    const cursor = editor.getCursor();
+    editor.handleInput('\x17');
+    editor.handleInput('d');
+    editor.handleInput('u');
+    expect(tui.scrollBy).not.toHaveBeenCalled();
+    expect(editor.getText()).toBe('unchanged buffer');
+    expect(editor.getCursor()).toEqual(cursor);
+    expect(inAltScreen(editor)).toBe(true);
+  });
+
+  it('ctrl+d with an empty buffer does not exit or edit', () => {
+    const { editor, tui } = makeEditor();
+    editor.setText('');
+    editor.handleInput('\x17');
+    editor.handleInput('\x04');
+    expect(tui.scrollBy.mock.calls).toEqual([[7]]);
+    expect(editor.getText()).toBe('');
     expect(inAltScreen(editor)).toBe(true);
     expect(editor.modeLabel).toBe(' ALT-S ');
   });

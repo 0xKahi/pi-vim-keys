@@ -263,18 +263,20 @@ export class VimModalEditor extends CustomEditor {
       this.setMode('normal');
       return;
     }
+    if (matchesKey(data, 'ctrl+d')) {
+      this.altScreen.scrollHalfPage(1);
+      return;
+    }
+    if (matchesKey(data, 'ctrl+u')) {
+      this.altScreen.scrollHalfPage(-1);
+      return;
+    }
     switch (data) {
       case 'j':
         this.altScreen.scrollLines(1);
         break;
       case 'k':
         this.altScreen.scrollLines(-1);
-        break;
-      case 'd':
-        this.altScreen.scrollHalfPage(1);
-        break;
-      case 'u':
-        this.altScreen.scrollHalfPage(-1);
         break;
       case 'G':
         this.altScreen.scrollToBottom();

@@ -55,15 +55,23 @@ When Pi is not running in fullscreen mode, pressing a key bound to `pi.vimKeys.a
 - **THEN** config validation fails for that config layer with a schema error
 
 ### Requirement: Scroll the transcript by line and half page
-While in alt-screen mode, `j` SHALL scroll the transcript down one line, `k` SHALL scroll it up one line, `d` SHALL scroll it down half a viewport, and `u` SHALL scroll it up half a viewport.
+While in alt-screen mode, `j` SHALL scroll the transcript down one line, `k` SHALL scroll it up one line, `ctrl-d` SHALL scroll it down half a viewport, and `ctrl-u` SHALL scroll it up half a viewport.
 
 #### Scenario: Line scroll
 - **WHEN** the editor is in alt-screen mode and the user presses `k`
 - **THEN** the transcript viewport moves up by one line and the editor stays in alt-screen mode
 
 #### Scenario: Half-page scroll
-- **WHEN** the editor is in alt-screen mode and the user presses `d`
+- **WHEN** the editor is in alt-screen mode and the user presses `ctrl-d`
 - **THEN** the transcript viewport moves down by about half its visible height
+
+#### Scenario: Half-page scroll up
+- **WHEN** the editor is in alt-screen mode and the user presses `ctrl-u`
+- **THEN** the transcript viewport moves up by about half its visible height
+
+#### Scenario: Half-page keys do not exit Pi or edit the buffer
+- **WHEN** the editor is in alt-screen mode with an empty buffer and the user presses `ctrl-d`
+- **THEN** Pi does not exit, the buffer is unchanged, and the editor stays in alt-screen mode
 
 ### Requirement: Jump to transcript top and bottom
 While in alt-screen mode, `gg` SHALL scroll the transcript to its top and `G` SHALL scroll it to its bottom.
@@ -104,6 +112,10 @@ While in alt-screen mode, keys other than the mapped navigation, search, and exi
 #### Scenario: Normal-mode edit key
 - **WHEN** the editor is in alt-screen mode and the user presses `x`
 - **THEN** the buffer is unchanged and the editor stays in alt-screen mode
+
+#### Scenario: Former half-page keys are ignored
+- **WHEN** the editor is in alt-screen mode and the user presses plain `d` or `u`
+- **THEN** the transcript does not scroll, the buffer is unchanged, and the editor stays in alt-screen mode
 
 ### Requirement: Alt-screen mode label
 While in alt-screen mode, the editor SHALL show the mode label `ALT-S` on its bottom border, in the same position and format as other mode labels (including pending-key suffixes). The editor SHALL NOT render any extra rows for this mode.

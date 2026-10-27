@@ -34,8 +34,8 @@ The leader key is `space`.
 | --- | --- |
 | `j` | Scroll the transcript down one line |
 | `k` | Scroll the transcript up one line |
-| `d` | Scroll the transcript down half a viewport |
-| `u` | Scroll the transcript up half a viewport |
+| `ctrl-d` | Scroll the transcript down half a viewport |
+| `ctrl-u` | Scroll the transcript up half a viewport |
 | `gg` | Jump to the top of the transcript |
 | `G` | Jump to the bottom of the transcript and resume following new output |
 | `<leader>/` | Open Pi's transcript search |
