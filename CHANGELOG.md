@@ -1,5 +1,11 @@
 # @0xkahi/pi-vim-keys
 
+## 1.2.1
+
+### Patch Changes
+
+- e4c5946: Alt-screen mode half-page scrolling now uses `ctrl-d` / `ctrl-u` to match vim. **Breaking:** plain `d` / `u` no longer scroll in alt-screen mode and are ignored like other unmapped keys.
+
 ## 1.2.0
 
 ### Minor Changes
