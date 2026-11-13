@@ -38,7 +38,7 @@
     "test": "bun test",
     "check": "bun run lint:fix && bun run type-check",
     "release": "changeset publish",
-    "version": "changeset version",
+    "version-packages": "changeset version",
     "changeset": "changeset",
     "buildSchema": "bun run scripts/build-schema.ts"
   },
@@ -48,13 +48,13 @@
     "@earendil-works/pi-tui": "*"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.4.15",
+    "@changesets/cli": "^3.0.3",
     "@earendil-works/pi-ai": "^1.5.2",
     "@earendil-works/pi-coding-agent": "^1.5.2",
     "@earendil-works/pi-tui": "^1.5.2",
-    "@biomejs/biome": "^2.4.15",
-    "@changesets/cli": "^2.31.0",
-    "@types/node": "^24.0.0",
     "@types/bun": "latest",
+    "@types/node": "^24.0.0",
     "bun-types": "latest",
     "typescript": "^7"
   },
