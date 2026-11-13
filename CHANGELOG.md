@@ -1,5 +1,11 @@
 # @0xkahi/pi-vim-keys
 
+## 1.2.2
+
+### Patch Changes
+
+- 6e21bec: ci: publish via npm trusted publishing (OIDC)
+
 ## 1.2.1
 
 ### Patch Changes
